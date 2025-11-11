@@ -1,6 +1,15 @@
 """
 Question Dialog - Create/Edit questions
-Version: 3.0 - Fully Modularized All Question Types
+Version: 3.1 - Added global image helper method
+Replace: src/admin_tool/dialogs/question_dialog.py
+
+CHANGES:
+- Added _attach_question_image() helper method
+- Updated create_fill_blank() to use helper
+- Updated create_true_false() to use helper (NEW IMAGE SUPPORT)
+- Updated create_matching() to use helper (NEW IMAGE SUPPORT)
+- Updated create_reordering() to use helper (NEW IMAGE SUPPORT)
+- Updated create_reading_comp() to use helper (NEW IMAGE SUPPORT)
 """
 
 import tkinter as tk
@@ -155,9 +164,6 @@ class QuestionDialog:
             self.save_current_form_data()
         
         self.update_form()
-        
-        # Note: Type conversion data restoration not implemented for modular forms yet
-        # Would require implementing a data injection method in each form
     
     def save_current_form_data(self):
         """Save current form data before type change"""
@@ -220,6 +226,40 @@ class QuestionDialog:
         """Get the lesson ID selected in the lesson dropdown"""
         selected_name = self.lesson_var.get()
         return self.lesson_mapping.get(selected_name)
+    
+    def _attach_question_image(self, question, question_id, data):
+        """
+        Global helper to attach question image to any question type.
+        Handles both new images and existing (already saved) images.
+        
+        Args:
+            question: Question object to attach image to
+            question_id: Question ID for image naming
+            data: Collected form data containing image info
+        
+        Returns:
+            question: Updated question object
+        """
+        if 'questionImage' not in data:
+            return question
+        
+        img_path = data['questionImage']
+        
+        # Check if image is already saved (starts with 'images/')
+        if img_path.startswith('images/'):
+            # Already saved, just set the path
+            question.questionImage = img_path
+            question.questionImageScale = data.get('questionImageScale', DEFAULT_SCALE)
+        else:
+            # New image, needs to be copied
+            rel_path = copy_image_to_subject(img_path, self.subject.name, question_id, 'main')
+            if rel_path:
+                question.questionImage = rel_path
+                question.questionImageScale = validate_scale(
+                    data.get('questionImageScale', DEFAULT_SCALE)
+                )
+        
+        return question
     
     def save(self):
         """Save question"""
@@ -322,13 +362,14 @@ class QuestionDialog:
     
     def create_true_false(self, question_id, lesson_id, data):
         """Create True/False question from data"""
-        return TrueFalseQuestion(
+        new_question = TrueFalseQuestion(
             id=question_id,
             type='true_false',
             lessonId=lesson_id,
             question=data['question'],
             correct=data['correct']
         )
+        return self._attach_question_image(new_question, question_id, data)
     
     def create_fill_blank(self, question_id, lesson_id, data):
         """Create Fill in Blank question from data"""
@@ -339,17 +380,11 @@ class QuestionDialog:
             question=data['question'],
             correct=data['answers']
         )
-        
-        # Handle question image
-        if 'questionImage' in data:
-            new_question.questionImage = data['questionImage']
-            new_question.questionImageScale = data.get('questionImageScale', DEFAULT_SCALE)
-        
-        return new_question
+        return self._attach_question_image(new_question, question_id, data)
     
     def create_matching(self, question_id, lesson_id, data):
         """Create Matching question from data"""
-        return MatchingQuestion(
+        new_question = MatchingQuestion(
             id=question_id,
             type='matching',
             lessonId=lesson_id,
@@ -357,20 +392,22 @@ class QuestionDialog:
             pairs=data['pairs'],
             correct=data['correct']
         )
+        return self._attach_question_image(new_question, question_id, data)
     
     def create_reordering(self, question_id, lesson_id, data):
         """Create Reordering question from data"""
-        return ReorderingQuestion(
+        new_question = ReorderingQuestion(
             id=question_id,
             type='reordering',
             lessonId=lesson_id,
             question=data['question'],
             items=data['items']
         )
+        return self._attach_question_image(new_question, question_id, data)
     
     def create_reading_comp(self, question_id, lesson_id, data):
         """Create Reading Comprehension question from data"""
-        return ReadingComprehensionQuestion(
+        new_question = ReadingComprehensionQuestion(
             id=question_id,
             type='reading_comprehension',
             lessonId=lesson_id,
@@ -378,3 +415,4 @@ class QuestionDialog:
             passageId=f"passage_{question_id}",
             questions=data['sub_questions']
         )
+        return self._attach_question_image(new_question, question_id, data)
