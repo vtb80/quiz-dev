@@ -163,22 +163,6 @@
           "correct": 1
         }
       ]
-    },
-    {
-      "id": 7,
-      "type": "multiple_choice",
-      "lessonId": "L001",
-      "questionImage": "images/sample/q7_main.jpg",
-      "questionImageScale": 50,
-      "question": "Test",
-      "options": [
-        "a",
-        "b",
-        "c",
-        "d"
-      ],
-      "correct": 1,
-      "optionImageScale": 50
     }
   ]
 }
