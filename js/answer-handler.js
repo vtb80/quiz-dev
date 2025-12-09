@@ -14,6 +14,9 @@ export function collectAnswer(question) {
     case 'true_false':
       return collectRadioAnswer();
     
+    case 'multiple_choice_multiple':
+      return collectCheckboxAnswer();
+    
     case 'fill_in_blank':
       return collectFillBlankAnswer();
     
@@ -37,6 +40,15 @@ export function collectAnswer(question) {
 function collectRadioAnswer() {
   const selected = document.querySelector('input[name="answer"]:checked');
   return selected ? parseInt(selected.value) : null;
+}
+
+/**
+ * Collect checkbox answer (MCM - Multiple Choice Multiple)
+ */
+function collectCheckboxAnswer() {
+  const checkboxes = document.querySelectorAll('input[name="answer"]:checked');
+  const answers = Array.from(checkboxes).map(cb => parseInt(cb.value));
+  return answers.length > 0 ? answers : null;
 }
 
 /**
@@ -86,6 +98,13 @@ export function validateAnswer(question, answer) {
     return { valid: false, message: 'Please provide an answer' };
   }
   
+  // Special validation for MCM (array)
+  if (question.type === 'multiple_choice_multiple') {
+    if (!Array.isArray(answer) || answer.length === 0) {
+      return { valid: false, message: 'Please select at least one answer' };
+    }
+  }
+  
   // Special validation for reading comprehension
   if (question.type === 'reading_comprehension') {
     const hasAllAnswers = Object.values(answer).every(v => v !== null);
@@ -114,6 +133,9 @@ export function checkAnswer(question, answer) {
     case 'true_false':
       return answer === question.correct;
     
+    case 'multiple_choice_multiple':
+      return checkMultipleChoiceMultiple(question, answer);
+    
     case 'fill_in_blank':
       return checkFillInBlank(question, answer);
     
@@ -129,6 +151,31 @@ export function checkAnswer(question, answer) {
     default:
       return false;
   }
+}
+
+/**
+ * Check multiple choice multiple answer (EXACT MATCH required)
+ */
+function checkMultipleChoiceMultiple(question, answer) {
+  if (!answer || !Array.isArray(answer)) {
+    return false;
+  }
+  
+  if (!question.correct || !Array.isArray(question.correct)) {
+    return false;
+  }
+  
+  // Sort both arrays and compare
+  const userSorted = [...answer].sort((a, b) => a - b);
+  const correctSorted = [...question.correct].sort((a, b) => a - b);
+  
+  // Must have same length
+  if (userSorted.length !== correctSorted.length) {
+    return false;
+  }
+  
+  // Compare element by element
+  return userSorted.every((val, idx) => val === correctSorted[idx]);
 }
 
 /**
@@ -188,6 +235,14 @@ export function formatUserAnswer(question, answer) {
     case 'multiple_choice':
       return question.options[answer] || answer;
     
+    case 'multiple_choice_multiple':
+      if (!Array.isArray(answer) || answer.length === 0) {
+        return 'No answer provided';
+      }
+      // Sort and format as "A, B, D"
+      const sortedAnswers = [...answer].sort((a, b) => a - b);
+      return sortedAnswers.map(idx => question.options[idx]).join(', ');
+    
     case 'true_false':
       return answer === 0 ? 'True' : 'False';
     
@@ -225,6 +280,14 @@ export function formatCorrectAnswer(question) {
   switch(question.type) {
     case 'multiple_choice':
       return question.options[question.correct];
+    
+    case 'multiple_choice_multiple':
+      if (!Array.isArray(question.correct) || question.correct.length === 0) {
+        return 'N/A';
+      }
+      // Sort and format as "A, B, D"
+      const sortedCorrect = [...question.correct].sort((a, b) => a - b);
+      return sortedCorrect.map(idx => question.options[idx]).join(', ');
     
     case 'true_false':
       return question.correct === 0 ? 'True' : 'False';

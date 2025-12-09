@@ -1,6 +1,6 @@
 """
 Validation Functions
-Version: 2.1
+Version: 2.2 - Added multiple_choice_multiple validation
 """
 
 from typing import Tuple, List, Dict, Any
@@ -9,7 +9,8 @@ from shared.constants import (
     MIN_PAIRS_MATCHING,
     MIN_ITEMS_REORDERING,
     MIN_ANSWERS_FILL,
-    MIN_SUBQUESTIONS_READING
+    MIN_SUBQUESTIONS_READING,
+    MIN_CORRECT_ANSWERS_MCM
 )
 
 
@@ -36,6 +37,42 @@ class QuestionValidator:
         
         if correct_index < 0 or correct_index >= len(options):
             return False, f"Correct index must be between 0 and {len(options)-1}"
+        
+        return True, ""
+    
+    @staticmethod
+    def validate_multiple_choice_multiple(question_text: str, options: List[str], 
+                                         correct_indices: List[int]) -> Tuple[bool, str]:
+        """
+        Validate multiple choice question with multiple correct answers
+        Returns: (is_valid, error_message)
+        """
+        if not question_text or not question_text.strip():
+            return False, "Question text is required"
+        
+        if len(options) < MIN_OPTIONS_MC:
+            return False, f"Need at least {MIN_OPTIONS_MC} options"
+        
+        # Check for empty options
+        for i, opt in enumerate(options):
+            if not opt or not opt.strip():
+                return False, f"Option {i} is empty"
+        
+        # Validate correct indices
+        if not correct_indices or len(correct_indices) < MIN_CORRECT_ANSWERS_MCM:
+            return False, f"Need at least {MIN_CORRECT_ANSWERS_MCM} correct answer"
+        
+        if len(correct_indices) > len(options):
+            return False, "Too many correct answers"
+        
+        # Check for duplicates
+        if len(correct_indices) != len(set(correct_indices)):
+            return False, "Duplicate correct answer indices found"
+        
+        # Check indices are in valid range
+        for idx in correct_indices:
+            if idx < 0 or idx >= len(options):
+                return False, f"Correct index {idx} is out of range (0-{len(options)-1})"
         
         return True, ""
     
@@ -156,6 +193,7 @@ class QuestionValidator:
         """
         validators = {
             'multiple_choice': QuestionValidator.validate_multiple_choice,
+            'multiple_choice_multiple': QuestionValidator.validate_multiple_choice_multiple,
             'true_false': QuestionValidator.validate_true_false,
             'fill_in_blank': QuestionValidator.validate_fill_in_blank,
             'matching': QuestionValidator.validate_matching,

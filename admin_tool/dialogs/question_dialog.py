@@ -1,15 +1,6 @@
 """
 Question Dialog - Create/Edit questions
-Version: 3.1 - Added global image helper method
-Replace: src/admin_tool/dialogs/question_dialog.py
-
-CHANGES:
-- Added _attach_question_image() helper method
-- Updated create_fill_blank() to use helper
-- Updated create_true_false() to use helper (NEW IMAGE SUPPORT)
-- Updated create_matching() to use helper (NEW IMAGE SUPPORT)
-- Updated create_reordering() to use helper (NEW IMAGE SUPPORT)
-- Updated create_reading_comp() to use helper (NEW IMAGE SUPPORT)
+Version: 3.2 - Added MultipleChoiceMultiple support
 """
 
 import tkinter as tk
@@ -27,6 +18,7 @@ from shared.constants import QUESTION_TYPES, QUESTION_TYPE_NAMES, OTHERS_CATEGOR
 # Import all modular forms
 from admin_tool.dialogs.question_forms import (
     MultipleChoiceForm,
+    MultipleChoiceMultipleForm,
     TrueFalseForm,
     FillInBlankForm,
     MatchingForm,
@@ -128,7 +120,7 @@ class QuestionDialog:
         ttk.Label(type_frame, text="Question Type:", font=('', 10, 'bold')).pack(side=tk.LEFT, padx=5)
         
         type_combo = ttk.Combobox(type_frame, textvariable=self.type_var,
-                                  values=QUESTION_TYPES, state="readonly", width=25, font=('', 10))
+                                  values=QUESTION_TYPES, state="readonly", width=35, font=('', 10))
         type_combo.pack(side=tk.LEFT, padx=5)
         type_combo.bind('<<ComboboxSelected>>', self.on_type_change)
         
@@ -192,6 +184,12 @@ class QuestionDialog:
                 self.question if self.mode == "edit" and isinstance(self.question, MultipleChoiceQuestion) else None
             )
         
+        elif qtype == "multiple_choice_multiple":
+            self.current_form = MultipleChoiceMultipleForm(
+                self.content_frame, self.subject, self.lesson_id, self.mode,
+                self.question if self.mode == "edit" and isinstance(self.question, MultipleChoiceMultipleQuestion) else None
+            )
+        
         elif qtype == "true_false":
             self.current_form = TrueFalseForm(
                 self.content_frame, self.subject, self.lesson_id, self.mode,
@@ -230,28 +228,16 @@ class QuestionDialog:
     def _attach_question_image(self, question, question_id, data):
         """
         Global helper to attach question image to any question type.
-        Handles both new images and existing (already saved) images.
-        
-        Args:
-            question: Question object to attach image to
-            question_id: Question ID for image naming
-            data: Collected form data containing image info
-        
-        Returns:
-            question: Updated question object
         """
         if 'questionImage' not in data:
             return question
         
         img_path = data['questionImage']
         
-        # Check if image is already saved (starts with 'images/')
         if img_path.startswith('images/'):
-            # Already saved, just set the path
             question.questionImage = img_path
             question.questionImageScale = data.get('questionImageScale', DEFAULT_SCALE)
         else:
-            # New image, needs to be copied
             rel_path = copy_image_to_subject(img_path, self.subject.name, question_id, 'main')
             if rel_path:
                 question.questionImage = rel_path
@@ -280,7 +266,7 @@ class QuestionDialog:
                 messagebox.showerror("Error", "Failed to collect form data")
                 return
             
-            # Check for errors in collected data (from matching/reading comp)
+            # Check for errors in collected data
             if 'error' in data:
                 messagebox.showerror("Validation Error", data['error'])
                 return
@@ -288,6 +274,8 @@ class QuestionDialog:
             # Create question based on type
             if qtype == "multiple_choice":
                 new_question = self.create_multiple_choice(question_id, selected_lesson_id, data)
+            elif qtype == "multiple_choice_multiple":
+                new_question = self.create_multiple_choice_multiple(question_id, selected_lesson_id, data)
             elif qtype == "true_false":
                 new_question = self.create_true_false(question_id, selected_lesson_id, data)
             elif qtype == "fill_in_blank":
@@ -337,6 +325,38 @@ class QuestionDialog:
             question=data['question'],
             options=data['options'],
             correct=data['correct']
+        )
+        
+        # Handle question image
+        if 'questionImage' in data:
+            new_question.questionImage = data['questionImage']
+            new_question.questionImageScale = data.get('questionImageScale', DEFAULT_SCALE)
+        
+        # Handle option images
+        if data.get('use_option_images'):
+            option_images = {}
+            for i, img_path in data.get('option_images_temp', {}).items():
+                if img_path.startswith('images/'):
+                    option_images[str(i)] = img_path
+                else:
+                    rel_path = copy_image_to_subject(img_path, self.subject.name, question_id, f'option_{i}')
+                    if rel_path:
+                        option_images[str(i)] = rel_path
+            
+            new_question.optionImages = option_images
+            new_question.optionImageScale = data.get('option_scale', DEFAULT_SCALE)
+        
+        return new_question
+    
+    def create_multiple_choice_multiple(self, question_id, lesson_id, data):
+        """Create Multiple Choice Multiple question from data"""
+        new_question = MultipleChoiceMultipleQuestion(
+            id=question_id,
+            type='multiple_choice_multiple',
+            lessonId=lesson_id,
+            question=data['question'],
+            options=data['options'],
+            correct=data['correct']  # This is a LIST of indices
         )
         
         # Handle question image

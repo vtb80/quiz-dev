@@ -1,6 +1,6 @@
 """
 Details Panel Widget - Displays question/lesson details
-Version: 2.1
+Version: 2.2 - Added MCM support
 """
 
 import tkinter as tk
@@ -167,6 +167,17 @@ class DetailsPanel:
                 mark = "✓" if i == q.correct else " "
                 img_indicator = " 🖼️" if hasattr(q, 'optionImages') and q.optionImages and q.optionImages.get(str(i)) else ""
                 text += f"  [{mark}] {i}. {opt}{img_indicator}\n"
+        
+        elif q.type == "multiple_choice_multiple":
+            text += f"Question:\n{q.question}\n\nOptions:\n"
+            for i, opt in enumerate(q.options):
+                mark = "✓" if i in q.correct else " "
+                img_indicator = " 🖼️" if hasattr(q, 'optionImages') and q.optionImages and q.optionImages.get(str(i)) else ""
+                text += f"  [{mark}] {i}. {opt}{img_indicator}\n"
+            
+            # Show all correct answers
+            correct_indices = ", ".join(str(i) for i in sorted(q.correct))
+            text += f"\nCorrect answers: {correct_indices}\n"
         
         elif q.type == "true_false":
             text += f"Question:\n{q.question}\n\n"

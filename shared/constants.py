@@ -1,16 +1,17 @@
 """
 Shared Constants and Configuration
-Version: 2.1
+Version: 2.2 - Added multiple_choice_multiple type
 """
 
 # Application Info
 APP_NAME = "Quiz Admin"
-APP_VERSION = "2.1"
+APP_VERSION = "2.2"
 APP_TITLE = f"{APP_NAME} v{APP_VERSION} - Modular Edition"
 
 # Question Types
 QUESTION_TYPES = [
     "multiple_choice",
+    "multiple_choice_multiple",  # NEW
     "true_false",
     "fill_in_blank",
     "matching",
@@ -20,6 +21,7 @@ QUESTION_TYPES = [
 
 QUESTION_TYPE_NAMES = {
     'multiple_choice': 'Multiple Choice',
+    'multiple_choice_multiple': 'Multiple Choice (Multiple Answers)',  # NEW
     'true_false': 'True/False',
     'fill_in_blank': 'Fill in the Blank',
     'matching': 'Matching',
@@ -29,6 +31,7 @@ QUESTION_TYPE_NAMES = {
 
 QUESTION_TYPE_ICONS = {
     'multiple_choice': 'MC',
+    'multiple_choice_multiple': 'MCM',  # NEW
     'true_false': 'TF',
     'fill_in_blank': 'FILL',
     'matching': 'MATCH',
@@ -70,6 +73,7 @@ MIN_PAIRS_MATCHING = 2
 MIN_ITEMS_REORDERING = 2
 MIN_ANSWERS_FILL = 1
 MIN_SUBQUESTIONS_READING = 1
+MIN_CORRECT_ANSWERS_MCM = 1  # NEW - At least 1 correct answer required
 
 # Default Values
 DEFAULT_NUM_QUESTIONS = 5

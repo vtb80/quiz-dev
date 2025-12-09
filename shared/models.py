@@ -1,6 +1,6 @@
 """
 Data Models for Quiz Application
-Version: 2.1
+Version: 2.2 - Added MultipleChoiceMultipleQuestion
 """
 
 from dataclasses import dataclass, field, asdict
@@ -53,6 +53,8 @@ class Question:
         # Route to appropriate subclass
         if qtype == 'multiple_choice':
             return MultipleChoiceQuestion.from_dict(data)
+        elif qtype == 'multiple_choice_multiple':
+            return MultipleChoiceMultipleQuestion.from_dict(data)
         elif qtype == 'true_false':
             return TrueFalseQuestion.from_dict(data)
         elif qtype == 'fill_in_blank':
@@ -98,6 +100,35 @@ class MultipleChoiceQuestion(Question):
             question=data.get('question', ''),
             options=data.get('options', []),
             correct=data.get('correct', 0),
+            optionImages=data.get('optionImages'),
+            optionImageScale=data.get('optionImageScale', DEFAULT_IMAGE_SCALE)
+        )
+
+
+@dataclass
+class MultipleChoiceMultipleQuestion(Question):
+    """Multiple choice question with multiple correct answers"""
+    question: str = ""
+    options: List[str] = field(default_factory=list)
+    correct: List[int] = field(default_factory=list)  # List of correct indices
+    optionImages: Optional[Dict[str, str]] = None
+    optionImageScale: int = DEFAULT_IMAGE_SCALE
+    
+    def __post_init__(self):
+        # Ensure type is set
+        object.__setattr__(self, 'type', 'multiple_choice_multiple')
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'MultipleChoiceMultipleQuestion':
+        return cls(
+            id=data.get('id', 0),
+            type='multiple_choice_multiple',
+            lessonId=data.get('lessonId'),
+            questionImage=data.get('questionImage'),
+            questionImageScale=data.get('questionImageScale', DEFAULT_IMAGE_SCALE),
+            question=data.get('question', ''),
+            options=data.get('options', []),
+            correct=data.get('correct', []),  # Load as list
             optionImages=data.get('optionImages'),
             optionImageScale=data.get('optionImageScale', DEFAULT_IMAGE_SCALE)
         )

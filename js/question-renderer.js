@@ -12,6 +12,7 @@ import { state } from './state.js';
 export function renderQuestion(question) {
   const renderers = {
     'multiple_choice': renderMultipleChoice,
+    'multiple_choice_multiple': renderMultipleChoiceMultiple,
     'true_false': renderTrueFalse,
     'fill_in_blank': renderFillInBlank,
     'matching': renderMatching,
@@ -47,7 +48,7 @@ function renderQuestionImage(question) {
 }
 
 /**
- * Render Multiple Choice question
+ * Render Multiple Choice question (single answer)
  */
 function renderMultipleChoice(question) {
   const userAnswer = state.getCurrentAnswer();
@@ -94,6 +95,66 @@ function renderMultipleChoice(question) {
       html += `
         <label class="option">
           <input type="radio" name="answer" value="${item.originalIdx}" ${isSelected ? 'checked' : ''}>
+          ${item.opt}
+        </label>
+      `;
+    });
+  }
+  
+  return html + '</div>';
+}
+
+/**
+ * Render Multiple Choice Multiple question (multiple answers)
+ */
+function renderMultipleChoiceMultiple(question) {
+  const userAnswer = state.getCurrentAnswer() || [];
+  let html = `
+    <h3>${question.question}</h3>
+    <p class="instruction-text">Select <strong>ALL</strong> correct answers</p>
+  `;
+  
+  // Add question image if present
+  html += renderQuestionImage(question);
+  
+  // Check if using option images
+  const hasOptionImages = question.optionImages && Object.keys(question.optionImages).length > 0;
+  
+  if (hasOptionImages) {
+    // Render options as images with CHECKBOXES
+    html += '<div class="options options-images">';
+    
+    const optionScale = question.optionImageScale || 75;
+    const imageEntries = Object.entries(question.optionImages).map(([idx, imgPath]) => ({
+      originalIdx: parseInt(idx),
+      imgPath: imgPath
+    }));
+    const shuffledOptions = shuffleArray(imageEntries);
+    
+    shuffledOptions.forEach((item) => {
+      const isChecked = userAnswer.includes(item.originalIdx);
+      html += `
+        <label class="option option-image option-checkbox">
+          <input type="checkbox" name="answer" value="${item.originalIdx}" ${isChecked ? 'checked' : ''}>
+          <img src="${item.imgPath}" 
+               alt="Option ${item.originalIdx}" 
+               class="option-image-img"
+               style="max-width: ${optionScale}%; max-height: 200px;">
+        </label>
+      `;
+    });
+  } else {
+    // Render options as text with CHECKBOXES
+    html += '<div class="options options-checkboxes">';
+    
+    const options = question.options.map((opt, idx) => ({ opt, originalIdx: idx }));
+    const shuffledOptions = shuffleArray(options);
+    
+    shuffledOptions.forEach((item) => {
+      const isChecked = userAnswer.includes(item.originalIdx);
+      html += `
+        <label class="option option-checkbox">
+          <input type="checkbox" name="answer" value="${item.originalIdx}" ${isChecked ? 'checked' : ''}>
           ${item.opt}
         </label>
       `;
@@ -183,10 +244,6 @@ function renderReordering(question) {
   
   const items = question.items.map((item, idx) => ({ ...item, originalIdx: idx }));
   const shuffledItems = shuffleArray(items);
-  
-  // Debug: Log to verify shuffling (can remove later)
-  console.log('Original order:', question.items.map(i => i.order));
-  console.log('Shuffled order:', shuffledItems.map(i => i.order));
   
   shuffledItems.forEach((item) => {
     html += `

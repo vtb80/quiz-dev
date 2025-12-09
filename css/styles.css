@@ -133,6 +133,18 @@ button:disabled {
   line-height: 1.4;
 }
 
+/* Instruction text for MCM */
+.instruction-text {
+  font-size: 14px;
+  color: #667eea;
+  font-weight: bold;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: #f0f4ff;
+  border-left: 4px solid #667eea;
+  border-radius: 3px;
+}
+
 .passage {
   background: #f5f5f5;
   padding: 15px;
@@ -167,9 +179,26 @@ button:disabled {
 }
 
 .option input[type="radio"],
+.option input[type="checkbox"],
 .true-false input[type="radio"] {
   margin-right: 12px;
   cursor: pointer;
+}
+
+/* Checkbox specific styles */
+.option-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.options-checkboxes .option-checkbox {
+  background: #fafafa;
+}
+
+.options-checkboxes .option-checkbox:hover {
+  background: #e8f4f8;
+  border-color: #667eea;
 }
 
 .fill-blank-input {
@@ -396,9 +425,15 @@ button:disabled {
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
 }
 
-.option-image input[type="radio"] {
+.option-image input[type="radio"],
+.option-image input[type="checkbox"] {
   margin-bottom: 10px;
   cursor: pointer;
+}
+
+.option-image input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
 }
 
 .option-image-img {

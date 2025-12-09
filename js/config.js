@@ -6,29 +6,18 @@
 export const CONFIG = {
   // Available subjects to scan for
   POSSIBLE_SUBJECTS: [
-    'sample',
-    'science',
-    'khoa_hoc_tu_nhien',
-    'lich_su_dia_li',
-    'cong_nghe',
-    'tin_hoc',
-    'giao_duc_cong_dan'
+    'test 1'
   ],
 
   // Subject display names
   SUBJECT_ALIASES: {
-    'sample': 'Sample Questions',
-    'science': 'Science',
-    'khoa_hoc_tu_nhien': 'Khoa Học Tự Nhiên',
-    'cong_nghe': 'Công Nghệ',
-    'giao_duc_cong_dan': 'Giáo Dục Công Dân',
-    'lich_su_dia_li': 'Lịch Sử Địa Lí',
-    'tin_hoc': 'Tin Học'
+    'test 1': 'Sample Questions'
   },
 
   // Question type display names
   QUESTION_TYPE_NAMES: {
     'multiple_choice': 'Multiple Choice',
+    'multiple_choice_multiple': 'Multiple Choice (Multiple Answers)',
     'true_false': 'True/False',
     'fill_in_blank': 'Fill in the Blank',
     'matching': 'Matching',
