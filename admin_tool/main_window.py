@@ -1,7 +1,7 @@
 """
 Main Window - Admin Tool
 Handles the main application window and subject/lesson/question management
-Version: 2.1
+Version: 2.2 - Added enable/disable toggle functionality
 """
 
 import tkinter as tk
@@ -68,7 +68,7 @@ class MainWindow:
         # Create TreeManager
         self.tree_manager = TreeManager(self.tree, self)
         
-        # Buttons for Tree
+        # Buttons for Tree - Row 1
         btn_frame = ttk.Frame(left_frame)
         btn_frame.pack(fill=tk.X, pady=5)
         
@@ -91,19 +91,23 @@ class MainWindow:
         self.btn_move = ttk.Button(btn_frame, text="Move to...", command=self.move_question, 
                                    width=12, state=tk.DISABLED)
         self.btn_move.pack(side=tk.LEFT, padx=2)
-        
-        self.btn_move = ttk.Button(btn_frame, text="Move to...", command=self.move_question, 
-                           width=12, state=tk.DISABLED)
-        self.btn_move.pack(side=tk.LEFT, padx=2)
 
-        # NEW: Bulk move button
-        self.btn_bulk_move = ttk.Button(btn_frame, text="📦 Bulk Move", 
+        # Buttons for Tree - Row 2
+        btn_frame2 = ttk.Frame(left_frame)
+        btn_frame2.pack(fill=tk.X, pady=5)
+        
+        # NEW: Toggle Enable/Disable button
+        self.btn_toggle = ttk.Button(btn_frame2, text="⚡ Toggle Enable/Disable", 
+                                     command=self.toggle_enabled, 
+                                     width=20, state=tk.DISABLED)
+        self.btn_toggle.pack(side=tk.LEFT, padx=2)
+        
+        # Bulk move button
+        self.btn_bulk_move = ttk.Button(btn_frame2, text="📦 Bulk Move", 
                                 command=self.bulk_move_questions, 
                                 width=12, state=tk.DISABLED)
         self.btn_bulk_move.pack(side=tk.LEFT, padx=2)
 
-        # Lesson reorder buttons
-        reorder_frame = ttk.Frame(left_frame)
         # Lesson reorder buttons
         reorder_frame = ttk.Frame(left_frame)
         reorder_frame.pack(fill=tk.X, pady=5)
@@ -227,7 +231,7 @@ class MainWindow:
         
         # Create lesson
         lesson_id = self.current_subject.get_next_lesson_id()
-        lesson = Lesson(id=lesson_id, name=lesson_name)
+        lesson = Lesson(id=lesson_id, name=lesson_name, enabled=True)  # NEW: default enabled
         
         self.current_subject.add_lesson(lesson)
         
@@ -528,7 +532,6 @@ class MainWindow:
         else:
             messagebox.showerror("Error", "Failed to delete question")
     
-    
     def move_question(self):
         """Move question to another lesson"""
         selected = self.tree_manager.get_selected_item()
@@ -691,6 +694,160 @@ class MainWindow:
         
         dialog.protocol("WM_DELETE_WINDOW", cancel)
     
+    # ========================================================================
+    # NEW: TOGGLE ENABLE/DISABLE FUNCTIONALITY
+    # ========================================================================
+    
+    def toggle_enabled(self):
+        """Toggle enabled status of selected items"""
+        selection = self.tree.selection()
+        
+        if not selection:
+            return
+        
+        # Check if multiple items selected
+        if len(selection) > 1:
+            # Bulk toggle
+            self.bulk_toggle_enabled()
+        else:
+            # Single item toggle
+            selected = self.tree_manager.get_selected_item()
+            if not selected:
+                return
+            
+            if selected['type'] == 'lesson':
+                self.toggle_lesson_enabled(selected['id'])
+            elif selected['type'] == 'question':
+                self.toggle_question_enabled(selected['id'])
+    
+    def toggle_lesson_enabled(self, lesson_id: str):
+        """Toggle enabled status of a lesson"""
+        lesson = self.current_subject.get_lesson_by_id(lesson_id)
+        if not lesson:
+            return
+        
+        # Toggle status
+        current_status = getattr(lesson, 'enabled', True)
+        lesson.enabled = not current_status
+        
+        # Get questions in this lesson
+        questions = self.current_subject.get_questions_by_lesson(lesson_id)
+        
+        if not lesson.enabled:
+            # DISABLING lesson - ask about cascading disable
+            if questions:
+                if messagebox.askyesno("Cascade Disable", 
+                                      f"Also disable all {len(questions)} question(s) in this lesson?"):
+                    for q in questions:
+                        q.enabled = False
+        else:
+            # ENABLING lesson - ask about cascading enable
+            disabled_questions = [q for q in questions if not getattr(q, 'enabled', True)]
+            if disabled_questions:
+                if messagebox.askyesno("Cascade Enable", 
+                                      f"Also enable {len(disabled_questions)} disabled question(s) in this lesson?"):
+                    for q in disabled_questions:
+                        q.enabled = True
+        
+        # Save and refresh
+        if self.data_manager.save_subject(self.current_subject):
+            status_text = "disabled" if not lesson.enabled else "enabled"
+            self.tree_manager.refresh_tree(self.current_subject,
+                                          focus_item={'type': 'lesson', 'lesson_id': lesson_id})
+            messagebox.showinfo("Success", f"Lesson '{lesson.name}' {status_text}")
+        else:
+            messagebox.showerror("Error", "Failed to save changes")
+    
+    def toggle_question_enabled(self, question_id: int):
+        """Toggle enabled status of a question"""
+        question = self.current_subject.get_question_by_id(question_id)
+        if not question:
+            return
+        
+        # Toggle status
+        current_status = getattr(question, 'enabled', True)
+        question.enabled = not current_status
+        
+        # Save and refresh
+        if self.data_manager.save_subject(self.current_subject):
+            status_text = "disabled" if not question.enabled else "enabled"
+            self.tree_manager.refresh_tree(self.current_subject,
+                                          focus_item={'type': 'question', 'q_id': question_id})
+            
+            # Update details panel if still showing this question
+            selected = self.tree_manager.get_selected_item()
+            if selected and selected['type'] == 'question' and selected['id'] == question_id:
+                self.details_panel.show_question(question, self.current_subject)
+        else:
+            messagebox.showerror("Error", "Failed to save changes")
+
+    def bulk_toggle_enabled(self):
+        """Bulk toggle enabled status"""
+        selection = self.tree.selection()
+        
+        # Collect items
+        lessons_to_toggle = []
+        questions_to_toggle = []
+        
+        for item in selection:
+            tags = self.tree.item(item, 'tags')
+            if len(tags) >= 2:
+                if tags[0] == 'lesson':
+                    lessons_to_toggle.append(tags[1])
+                elif tags[0] == 'question':
+                    questions_to_toggle.append(int(tags[1]))
+        
+        # Confirm action
+        if not lessons_to_toggle and not questions_to_toggle:
+            return
+        
+        msg = f"Toggle enabled/disabled status for:\n"
+        if lessons_to_toggle:
+            msg += f"• {len(lessons_to_toggle)} lesson(s)\n"
+        if questions_to_toggle:
+            msg += f"• {len(questions_to_toggle)} question(s)\n"
+        
+        if not messagebox.askyesno("Confirm Bulk Toggle", msg):
+            return
+        
+        # Toggle lessons
+        cascade_questions = False
+        if lessons_to_toggle:
+            # Ask about cascading
+            if messagebox.askyesno("Cascade to Questions", 
+                                  "Also toggle questions inside selected lessons?"):
+                cascade_questions = True
+        
+        for lesson_id in lessons_to_toggle:
+            lesson = self.current_subject.get_lesson_by_id(lesson_id)
+            if lesson:
+                current_status = getattr(lesson, 'enabled', True)
+                lesson.enabled = not current_status
+                
+                # Cascade to questions if requested
+                if cascade_questions:
+                    for q in self.current_subject.get_questions_by_lesson(lesson_id):
+                        q.enabled = lesson.enabled
+        
+        # Toggle questions
+        for q_id in questions_to_toggle:
+            question = self.current_subject.get_question_by_id(q_id)
+            if question:
+                current_status = getattr(question, 'enabled', True)
+                question.enabled = not current_status
+        
+        # Save and refresh
+        if self.data_manager.save_subject(self.current_subject):
+            self.tree_manager.refresh_tree(self.current_subject)
+            self.details_panel.clear()
+            messagebox.showinfo("Success", "Bulk toggle completed successfully")
+        else:
+            messagebox.showerror("Error", "Failed to save changes")
+
+    # ========================================================================
+    # END: TOGGLE ENABLE/DISABLE FUNCTIONALITY
+    # ========================================================================
+
     def on_question_saved(self, mode, question_id):
         """Callback after question is saved"""
         if mode == "add":
@@ -700,4 +857,4 @@ class MainWindow:
         elif mode == "edit":
             # Keep focus on edited question
             self.tree_manager.refresh_tree(self.current_subject,
-                                          focus_item={'type': 'question', 'q_id': question_id})
+                                          focus_item={'type': 'question', 'q_id': question_id})    

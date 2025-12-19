@@ -16,7 +16,7 @@ export function updateLessonDropdown() {
   // Add lessons that have questions
   state.allLessons.forEach(lesson => {
     const count = state.allQuestions.filter(q => q.lessonId === lesson.id).length;
-    if (count > 0) {
+    if (count > 0) {  // ← This naturally filters out lessons with 0 enabled questions
       const option = document.createElement('option');
       option.value = lesson.id;
       option.textContent = `${lesson.name} (${count} questions)`;

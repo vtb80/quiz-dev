@@ -1,6 +1,6 @@
 """
 Data Manager - Handles JSON file operations
-Version: 2.1
+Version: 2.2 - Added backward compatibility for enabled field
 """
 
 import json
@@ -15,9 +15,7 @@ from shared.constants import (
 
 
 class DataManager:
-      
     """Manages loading and saving of quiz data"""
-    
     
     @staticmethod
     def discover_subjects() -> dict:
@@ -52,10 +50,27 @@ class DataManager:
             if 'questions' not in data:
                 data['questions'] = []
             
-            # Migrate old questions (add lessonId if missing)
-            for q in data['questions']:
-                if 'lessonId' not in q:
-                    q['lessonId'] = None
+            # ===== BACKWARD COMPATIBILITY: Auto-migrate old data =====
+            # Add 'enabled' field to lessons if missing
+            for lesson in data['lessons']:
+                if 'enabled' not in lesson:
+                    lesson['enabled'] = True
+                    print(f"  Migration: Added 'enabled=True' to lesson '{lesson.get('name', 'Unknown')}'")
+            
+            # Add 'enabled' field to questions if missing
+            enabled_count = 0
+            for question in data['questions']:
+                if 'enabled' not in question:
+                    question['enabled'] = True
+                    enabled_count += 1
+                
+                # Also migrate old questions (add lessonId if missing)
+                if 'lessonId' not in question:
+                    question['lessonId'] = None
+            
+            if enabled_count > 0:
+                print(f"  Migration: Added 'enabled=True' to {enabled_count} question(s)")
+            # ===== END BACKWARD COMPATIBILITY =====
             
             subject = Subject.from_dict(subject_name, filename, data)
             return subject
@@ -117,7 +132,6 @@ class DataManager:
             return subject
     
         return None
-
     
     @staticmethod
     def delete_subject(subject: Subject, delete_images: bool = True) -> bool:
@@ -237,26 +251,77 @@ class DataManager:
         stats = {
             'total_questions': len(subject.questions),
             'total_lessons': len(subject.lessons),
+            'enabled_questions': sum(1 for q in subject.questions if getattr(q, 'enabled', True)),
+            'disabled_questions': sum(1 for q in subject.questions if not getattr(q, 'enabled', True)),
+            'enabled_lessons': sum(1 for l in subject.lessons if getattr(l, 'enabled', True)),
+            'disabled_lessons': sum(1 for l in subject.lessons if not getattr(l, 'enabled', True)),
             'questions_by_type': {},
             'questions_by_lesson': {},
             'questions_with_images': 0,
             'unassigned_questions': 0
         }
         
-        # Count by type
+        # Count by type (only enabled)
         for q in subject.questions:
-            qtype = q.type
-            stats['questions_by_type'][qtype] = stats['questions_by_type'].get(qtype, 0) + 1
+            if getattr(q, 'enabled', True):
+                qtype = q.type
+                stats['questions_by_type'][qtype] = stats['questions_by_type'].get(qtype, 0) + 1
         
-        # Count by lesson
+        # Count by lesson (only enabled)
         for lesson in subject.lessons:
-            count = len(subject.get_questions_by_lesson(lesson.id))
-            stats['questions_by_lesson'][lesson.name] = count
+            if getattr(lesson, 'enabled', True):
+                count = subject.get_enabled_questions_count(lesson.id)
+                if count > 0:
+                    stats['questions_by_lesson'][lesson.name] = count
         
-        # Count unassigned
-        stats['unassigned_questions'] = len(subject.get_questions_by_lesson(None))
+        # Count unassigned (only enabled)
+        stats['unassigned_questions'] = sum(
+            1 for q in subject.get_questions_by_lesson(None) 
+            if getattr(q, 'enabled', True)
+        )
         
-        # Count with images
-        stats['questions_with_images'] = sum(1 for q in subject.questions if q.questionImage)
+        # Count with images (only enabled)
+        stats['questions_with_images'] = sum(
+            1 for q in subject.questions 
+            if q.questionImage and getattr(q, 'enabled', True)
+        )
         
         return stats
+    
+    @staticmethod
+    def migrate_subject_to_latest(subject: Subject) -> bool:
+        """
+        Migrate subject data to latest format and save
+        This can be called manually if needed
+        Returns: True if successful, False otherwise
+        """
+        try:
+            migrated = False
+            
+            # Ensure all lessons have 'enabled' field
+            for lesson in subject.lessons:
+                if not hasattr(lesson, 'enabled'):
+                    lesson.enabled = True
+                    migrated = True
+            
+            # Ensure all questions have 'enabled' field
+            for question in subject.questions:
+                if not hasattr(question, 'enabled'):
+                    question.enabled = True
+                    migrated = True
+            
+            if migrated:
+                print(f"Migrating subject '{subject.name}' to latest format...")
+                if DataManager.save_subject(subject):
+                    print(f"  ✓ Migration completed successfully")
+                    return True
+                else:
+                    print(f"  ✗ Migration failed during save")
+                    return False
+            else:
+                print(f"Subject '{subject.name}' is already up-to-date")
+                return True
+        
+        except Exception as e:
+            print(f"Error during migration: {str(e)}")
+            return False

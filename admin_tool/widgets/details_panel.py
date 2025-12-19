@@ -1,6 +1,6 @@
 """
 Details Panel Widget - Displays question/lesson details
-Version: 2.2 - Added MCM support
+Version: 2.3 - Added enabled/disabled status display
 """
 
 import tkinter as tk
@@ -85,26 +85,44 @@ class DetailsPanel:
         
         # Get lesson statistics
         questions = subject.get_questions_by_lesson(lesson.id)
+        enabled_count = sum(1 for q in questions if getattr(q, 'enabled', True))
+        disabled_count = len(questions) - enabled_count
+        
+        # Get lesson status
+        lesson_enabled = getattr(lesson, 'enabled', True)
+        status_text = "✓ Enabled" if lesson_enabled else "🚫 Disabled"
         
         details = f"LESSON DETAILS\n{'='*50}\n\n"
         details += f"Name: {lesson.name}\n"
         details += f"ID: {lesson.id}\n"
-        details += f"Questions: {len(questions)}\n\n"
+        details += f"Status: {status_text}\n"
+        details += f"Questions: {enabled_count}\n"
+        
+        if disabled_count > 0:
+            details += f"Disabled Questions: {disabled_count}\n"
+        
+        details += "\n"
         
         if questions:
-            details += "Question Types:\n"
+            # Show question types breakdown (enabled only)
+            details += "Question Types (Enabled):\n"
             types = {}
             for q in questions:
-                qtype = QUESTION_TYPE_NAMES.get(q.type, q.type)
-                types[qtype] = types.get(qtype, 0) + 1
+                if getattr(q, 'enabled', True):
+                    qtype = QUESTION_TYPE_NAMES.get(q.type, q.type)
+                    types[qtype] = types.get(qtype, 0) + 1
             
-            for qtype, count in sorted(types.items()):
-                details += f"  • {qtype}: {count}\n"
+            if types:
+                for qtype, count in sorted(types.items()):
+                    details += f"  • {qtype}: {count}\n"
+            else:
+                details += "  (All questions are disabled)\n"
             
-            # Count with images
-            with_images = sum(1 for q in questions if q.questionImage)
+            # Count with images (enabled only)
+            with_images = sum(1 for q in questions 
+                            if q.questionImage and getattr(q, 'enabled', True))
             if with_images > 0:
-                details += f"\nQuestions with images: {with_images}\n"
+                details += f"\nWith images: {with_images}\n"
         
         text_widget.insert('1.0', details)
         text_widget.config(state=tk.DISABLED)
@@ -118,24 +136,37 @@ class DetailsPanel:
         text_widget.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         questions = subject.get_questions_by_lesson(None)
+        enabled_count = sum(1 for q in questions if getattr(q, 'enabled', True))
+        disabled_count = len(questions) - enabled_count
         
         details = f"OTHERS (UNASSIGNED)\n{'='*50}\n\n"
-        details += f"Questions: {len(questions)}\n\n"
+        details += f"Questions: {enabled_count}\n"
+        
+        if disabled_count > 0:
+            details += f"Disabled Questions: {disabled_count}\n"
+        
+        details += "\n"
         
         if questions:
-            details += "Question Types:\n"
+            # Show question types breakdown (enabled only)
+            details += "Question Types (Enabled):\n"
             types = {}
             for q in questions:
-                qtype = QUESTION_TYPE_NAMES.get(q.type, q.type)
-                types[qtype] = types.get(qtype, 0) + 1
+                if getattr(q, 'enabled', True):
+                    qtype = QUESTION_TYPE_NAMES.get(q.type, q.type)
+                    types[qtype] = types.get(qtype, 0) + 1
             
-            for qtype, count in sorted(types.items()):
-                details += f"  • {qtype}: {count}\n"
+            if types:
+                for qtype, count in sorted(types.items()):
+                    details += f"  • {qtype}: {count}\n"
+            else:
+                details += "  (All questions are disabled)\n"
             
-            # Count with images
-            with_images = sum(1 for q in questions if q.questionImage)
+            # Count with images (enabled only)
+            with_images = sum(1 for q in questions 
+                            if q.questionImage and getattr(q, 'enabled', True))
             if with_images > 0:
-                details += f"\nQuestions with images: {with_images}\n"
+                details += f"\nWith images: {with_images}\n"
         
         text_widget.insert('1.0', details)
         text_widget.config(state=tk.DISABLED)
@@ -143,14 +174,25 @@ class DetailsPanel:
     def _format_question_text(self, q: Question, subject: Subject) -> str:
         """Format question for text display"""
         qtype_name = QUESTION_TYPE_NAMES.get(q.type, q.type)
+        
+        # Get question status
+        question_enabled = getattr(q, 'enabled', True)
+        status_text = "✓ Enabled" if question_enabled else "🚫 Disabled"
+        
         text = f"QUESTION DETAILS\n{'='*50}\n\n"
         text += f"Type: {qtype_name}\n"
         text += f"ID: {q.id}\n"
+        text += f"Status: {status_text}\n"
         
         # Show lesson
         if q.lessonId:
             lesson = subject.get_lesson_by_id(q.lessonId)
-            text += f"Lesson: {lesson.name if lesson else 'Unknown'}\n"
+            if lesson:
+                lesson_enabled = getattr(lesson, 'enabled', True)
+                lesson_status = " (Disabled)" if not lesson_enabled else ""
+                text += f"Lesson: {lesson.name}{lesson_status}\n"
+            else:
+                text += "Lesson: Unknown\n"
         else:
             text += "Lesson: Others\n"
         

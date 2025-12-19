@@ -1,6 +1,6 @@
 """
 Tree Manager - Handles tree view display and interactions
-Version: 2.2 - Fixed auto-expansion after editing
+Version: 2.3 - Added enable/disable visual indicators
 """
 
 from shared.constants import *
@@ -16,6 +16,9 @@ class TreeManager:
         
         # Enable multi-select
         self.tree.config(selectmode='extended')
+        
+        # Configure tags for styling disabled items
+        self.tree.tag_configure('disabled', foreground='#999999')  # Gray color
         
         # Bind events
         self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
@@ -54,15 +57,27 @@ class TreeManager:
         for lesson in subject.lessons:
             lesson_id = lesson.id
             lesson_name = lesson.name
+            lesson_enabled = getattr(lesson, 'enabled', True)
             
-            # Count questions in this lesson
+            # Get questions in this lesson
             questions = subject.get_questions_by_lesson(lesson_id)
-            count = len(questions)
+            
+            # Count ENABLED questions only
+            enabled_count = sum(1 for q in questions if getattr(q, 'enabled', True))
+            
+            # Visual indicator for disabled lesson
+            status_icon = "" if lesson_enabled else "🚫 "
             
             # Create lesson node
-            lesson_text = f"{ICON_LESSON} {lesson_name} ({count})"
+            lesson_text = f"{status_icon}{ICON_LESSON} {lesson_name} ({enabled_count})"
+            
+            # Build tags list
+            lesson_tags = ['lesson', lesson_id]
+            if not lesson_enabled:
+                lesson_tags.append('disabled')
+            
             lesson_node = self.tree.insert('', 'end', text=lesson_text,
-                                          tags=('lesson', lesson_id), open=False)
+                                          tags=tuple(lesson_tags), open=False)
             
             # Restore expanded state based on lesson_id
             if preserve_expansion and lesson_id in expanded_lesson_ids:
@@ -70,27 +85,15 @@ class TreeManager:
             
             # Add questions under lesson
             for question in questions:
-                qtype_short = QUESTION_TYPE_ICONS.get(question.type, '?')
-                
-                # Get question text
-                if hasattr(question, 'question'):
-                    qtext = question.question[:50]
-                elif hasattr(question, 'passage'):
-                    qtext = question.passage[:50]
-                else:
-                    qtext = f"Question {question.id}"
-                
-                # Add image indicator
-                has_img = f"{ICON_IMAGE} " if question.questionImage else ""
-                
-                question_text = f"  {has_img}[{qtype_short}] {qtext}..."
-                self.tree.insert(lesson_node, 'end', text=question_text,
-                               tags=('question', str(question.id)))
+                self._add_question_to_tree(lesson_node, question)
         
         # Add "Others" category
         others_questions = subject.get_questions_by_lesson(None)
-        count = len(others_questions)
-        others_text = f"{OTHERS_DISPLAY} ({count})"
+        
+        # Count ENABLED questions in Others
+        enabled_count = sum(1 for q in others_questions if getattr(q, 'enabled', True))
+        
+        others_text = f"{OTHERS_DISPLAY} ({enabled_count})"
         others_node = self.tree.insert('', 'end', text=others_text,
                                        tags=('others',), open=False)
         
@@ -100,25 +103,43 @@ class TreeManager:
         
         # Add questions under Others
         for question in others_questions:
-            qtype_short = QUESTION_TYPE_ICONS.get(question.type, '?')
-            
-            # Get question text
-            if hasattr(question, 'question'):
-                qtext = question.question[:50]
-            elif hasattr(question, 'passage'):
-                qtext = question.passage[:50]
-            else:
-                qtext = f"Question {question.id}"
-            
-            has_img = f"{ICON_IMAGE} " if question.questionImage else ""
-            
-            question_text = f"  {has_img}[{qtype_short}] {qtext}..."
-            self.tree.insert(others_node, 'end', text=question_text,
-                           tags=('question', str(question.id)))
+            self._add_question_to_tree(others_node, question)
         
         # Handle focus
         if focus_item:
             self.focus_on_item(focus_item, subject)
+    
+    def _add_question_to_tree(self, parent_node, question):
+        """
+        Helper method to add a question to the tree
+        Args:
+            parent_node: Parent tree node (lesson or others)
+            question: Question object to add
+        """
+        qtype_short = QUESTION_TYPE_ICONS.get(question.type, '?')
+        question_enabled = getattr(question, 'enabled', True)
+        
+        # Get question text
+        if hasattr(question, 'question'):
+            qtext = question.question[:50]
+        elif hasattr(question, 'passage'):
+            qtext = question.passage[:50]
+        else:
+            qtext = f"Question {question.id}"
+        
+        # Visual indicators
+        status_icon = "" if question_enabled else "🚫 "
+        has_img = f"{ICON_IMAGE} " if question.questionImage else ""
+        
+        question_text = f"  {status_icon}{has_img}[{qtype_short}] {qtext}..."
+        
+        # Build tags list
+        question_tags = ['question', str(question.id)]
+        if not question_enabled:
+            question_tags.append('disabled')
+        
+        self.tree.insert(parent_node, 'end', text=question_text,
+                       tags=tuple(question_tags))
     
     def focus_on_item(self, item_info: dict, subject: Subject):
         """
@@ -202,6 +223,30 @@ class TreeManager:
         
         return None
     
+    def get_selected_items(self):
+        """
+        Get information about all selected items (for multi-select)
+        Returns: list of dicts with 'type' and 'id'
+        """
+        selection = self.tree.selection()
+        items = []
+        
+        for item in selection:
+            tags = self.tree.item(item, 'tags')
+            if len(tags) < 1:
+                continue
+            
+            item_type = tags[0]
+            
+            if item_type == 'lesson' and len(tags) >= 2:
+                items.append({'type': 'lesson', 'id': tags[1]})
+            elif item_type == 'question' and len(tags) >= 2:
+                items.append({'type': 'question', 'id': int(tags[1])})
+            elif item_type == 'others':
+                items.append({'type': 'others', 'id': None})
+        
+        return items
+    
     def on_tree_select(self, event=None):
         """Handle tree selection event - supports multi-select"""
         selection = self.tree.selection()
@@ -248,13 +293,22 @@ class TreeManager:
         all_questions = True
         question_count = 0
         
+        # Check if all selected items are lessons
+        all_lessons = True
+        lesson_count = 0
+        
         for item in selection:
             tags = self.tree.item(item, 'tags')
-            if len(tags) >= 1 and tags[0] == 'question':
-                question_count += 1
-            else:
-                all_questions = False
-                break
+            if len(tags) >= 1:
+                if tags[0] == 'question':
+                    question_count += 1
+                    all_lessons = False
+                elif tags[0] == 'lesson':
+                    lesson_count += 1
+                    all_questions = False
+                else:
+                    all_questions = False
+                    all_lessons = False
         
         if all_questions and question_count > 0:
             # All selected are questions - enable bulk operations
@@ -265,20 +319,39 @@ class TreeManager:
             info_text = f"Selected: {question_count} question(s)\n\n"
             info_text += "Available actions:\n"
             info_text += "• Bulk Move to lesson\n"
+            info_text += "• Bulk Enable/Disable\n"
             info_text += "• Delete selected\n"
             
             import tkinter as tk
-            from tkinter import ttk
             text_widget = tk.Text(self.main_window.details_panel.content_frame, 
                                  font=('Consolas', 10), wrap=tk.WORD, 
                                  height=10, width=40)
             text_widget.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
             text_widget.insert('1.0', info_text)
             text_widget.config(state=tk.DISABLED)
-        else:
-            # Mixed selection or no questions
-            self.update_buttons('mixed', len(selection))
+        
+        elif all_lessons and lesson_count > 0:
+            # All selected are lessons - enable bulk operations
+            self.update_buttons('multi_lesson', lesson_count)
             
+            # Show multi-select info in details panel
+            self.main_window.details_panel.clear()
+            info_text = f"Selected: {lesson_count} lesson(s)\n\n"
+            info_text += "Available actions:\n"
+            info_text += "• Bulk Enable/Disable\n"
+            
+            import tkinter as tk
+            text_widget = tk.Text(self.main_window.details_panel.content_frame, 
+                                 font=('Consolas', 10), wrap=tk.WORD, 
+                                 height=10, width=40)
+            text_widget.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+            text_widget.insert('1.0', info_text)
+            text_widget.config(state=tk.DISABLED)
+        
+        else:
+            # Mixed selection
+            self.update_buttons('mixed', len(selection))
+    
     def on_tree_double_click(self, event):
         """Handle double-click on tree item"""
         selected = self.get_selected_item()
@@ -295,6 +368,19 @@ class TreeManager:
             self.main_window.btn_delete.config(state='normal')
             self.main_window.btn_move.config(state='disabled')
             self.main_window.btn_bulk_move.config(state='normal')
+            self.main_window.btn_toggle.config(state='normal')  # NEW
+            self.main_window.btn_move_up.config(state='disabled')
+            self.main_window.btn_move_down.config(state='disabled')
+        
+        elif item_type == 'multi_lesson' and count > 1:
+            # Multiple lessons selected
+            self.main_window.btn_add_question.config(state='disabled')
+            self.main_window.btn_add_lesson.config(state='normal')
+            self.main_window.btn_edit.config(state='disabled')
+            self.main_window.btn_delete.config(state='disabled')
+            self.main_window.btn_move.config(state='disabled')
+            self.main_window.btn_bulk_move.config(state='disabled')
+            self.main_window.btn_toggle.config(state='normal')  # NEW
             self.main_window.btn_move_up.config(state='disabled')
             self.main_window.btn_move_down.config(state='disabled')
         
@@ -305,6 +391,7 @@ class TreeManager:
             self.main_window.btn_delete.config(state='normal')
             self.main_window.btn_move.config(state='disabled')
             self.main_window.btn_bulk_move.config(state='disabled')
+            self.main_window.btn_toggle.config(state='normal')  # NEW
             self.main_window.btn_move_up.config(state='normal')
             self.main_window.btn_move_down.config(state='normal')
         
@@ -315,6 +402,7 @@ class TreeManager:
             self.main_window.btn_delete.config(state='normal')
             self.main_window.btn_move.config(state='normal')
             self.main_window.btn_bulk_move.config(state='disabled')
+            self.main_window.btn_toggle.config(state='normal')  # NEW
             self.main_window.btn_move_up.config(state='disabled')
             self.main_window.btn_move_down.config(state='disabled')
         
@@ -325,6 +413,7 @@ class TreeManager:
             self.main_window.btn_delete.config(state='disabled')
             self.main_window.btn_move.config(state='disabled')
             self.main_window.btn_bulk_move.config(state='disabled')
+            self.main_window.btn_toggle.config(state='disabled')  # NEW
             self.main_window.btn_move_up.config(state='disabled')
             self.main_window.btn_move_down.config(state='disabled')
         
@@ -336,5 +425,6 @@ class TreeManager:
             self.main_window.btn_delete.config(state='disabled')
             self.main_window.btn_move.config(state='disabled')
             self.main_window.btn_bulk_move.config(state='disabled')
+            self.main_window.btn_toggle.config(state='disabled')  # NEW
             self.main_window.btn_move_up.config(state='disabled')
             self.main_window.btn_move_down.config(state='disabled')

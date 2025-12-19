@@ -1,6 +1,6 @@
 """
 Data Models for Quiz Application
-Version: 2.2 - Added MultipleChoiceMultipleQuestion
+Version: 2.3 - Added enabled field for lessons and questions
 """
 
 from dataclasses import dataclass, field, asdict
@@ -13,6 +13,7 @@ class Lesson:
     """Represents a lesson within a subject"""
     id: str
     name: str
+    enabled: bool = True  # NEW FIELD
     
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON storage"""
@@ -23,11 +24,13 @@ class Lesson:
         """Create from dictionary"""
         return cls(
             id=data.get('id', ''),
-            name=data.get('name', '')
+            name=data.get('name', ''),
+            enabled=data.get('enabled', True)  # NEW - Default to enabled
         )
     
     def __str__(self):
-        return f"{self.name} ({self.id})"
+        status = "✓" if self.enabled else "✗"
+        return f"{self.name} ({self.id}) [{status}]"
 
 
 @dataclass
@@ -36,6 +39,7 @@ class Question:
     id: int
     type: str
     lessonId: Optional[str] = None
+    enabled: bool = True  # NEW FIELD
     questionImage: Optional[str] = None
     questionImageScale: int = DEFAULT_IMAGE_SCALE
     
@@ -71,6 +75,7 @@ class Question:
                 id=data.get('id', 0),
                 type=qtype,
                 lessonId=data.get('lessonId'),
+                enabled=data.get('enabled', True),  # NEW
                 questionImage=data.get('questionImage'),
                 questionImageScale=data.get('questionImageScale', DEFAULT_IMAGE_SCALE)
             )
@@ -95,6 +100,7 @@ class MultipleChoiceQuestion(Question):
             id=data.get('id', 0),
             type='multiple_choice',
             lessonId=data.get('lessonId'),
+            enabled=data.get('enabled', True),  # NEW
             questionImage=data.get('questionImage'),
             questionImageScale=data.get('questionImageScale', DEFAULT_IMAGE_SCALE),
             question=data.get('question', ''),
@@ -124,6 +130,7 @@ class MultipleChoiceMultipleQuestion(Question):
             id=data.get('id', 0),
             type='multiple_choice_multiple',
             lessonId=data.get('lessonId'),
+            enabled=data.get('enabled', True),  # NEW
             questionImage=data.get('questionImage'),
             questionImageScale=data.get('questionImageScale', DEFAULT_IMAGE_SCALE),
             question=data.get('question', ''),
@@ -149,6 +156,7 @@ class TrueFalseQuestion(Question):
             id=data.get('id', 0),
             type='true_false',
             lessonId=data.get('lessonId'),
+            enabled=data.get('enabled', True),  # NEW
             questionImage=data.get('questionImage'),
             questionImageScale=data.get('questionImageScale', DEFAULT_IMAGE_SCALE),
             question=data.get('question', ''),
@@ -171,6 +179,7 @@ class FillInBlankQuestion(Question):
             id=data.get('id', 0),
             type='fill_in_blank',
             lessonId=data.get('lessonId'),
+            enabled=data.get('enabled', True),  # NEW
             questionImage=data.get('questionImage'),
             questionImageScale=data.get('questionImageScale', DEFAULT_IMAGE_SCALE),
             question=data.get('question', ''),
@@ -205,6 +214,7 @@ class MatchingQuestion(Question):
             id=data.get('id', 0),
             type='matching',
             lessonId=data.get('lessonId'),
+            enabled=data.get('enabled', True),  # NEW
             questionImage=data.get('questionImage'),
             questionImageScale=data.get('questionImageScale', DEFAULT_IMAGE_SCALE),
             question=data.get('question', ''),
@@ -238,6 +248,7 @@ class ReorderingQuestion(Question):
             id=data.get('id', 0),
             type='reordering',
             lessonId=data.get('lessonId'),
+            enabled=data.get('enabled', True),  # NEW
             questionImage=data.get('questionImage'),
             questionImageScale=data.get('questionImageScale', DEFAULT_IMAGE_SCALE),
             question=data.get('question', ''),
@@ -273,6 +284,7 @@ class ReadingComprehensionQuestion(Question):
             id=data.get('id', 0),
             type='reading_comprehension',
             lessonId=data.get('lessonId'),
+            enabled=data.get('enabled', True),  # NEW
             questionImage=data.get('questionImage'),
             questionImageScale=data.get('questionImageScale', DEFAULT_IMAGE_SCALE),
             passage=data.get('passage', ''),
@@ -320,6 +332,11 @@ class Subject:
     def get_questions_by_lesson(self, lesson_id: Optional[str]) -> List[Question]:
         """Get all questions for a lesson"""
         return [q for q in self.questions if q.lessonId == lesson_id]
+    
+    def get_enabled_questions_count(self, lesson_id: Optional[str]) -> int:
+        """Get count of enabled questions for a lesson"""
+        questions = self.get_questions_by_lesson(lesson_id)
+        return sum(1 for q in questions if getattr(q, 'enabled', True))
     
     def get_next_question_id(self) -> int:
         """Get next available question ID"""
