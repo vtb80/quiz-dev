@@ -137,3 +137,25 @@ export function shuffleArray(array) {
   }
   return shuffled;
 }
+
+/**
+ * Update number of questions input based on filtered questions
+ */
+export function updateQuestionNumberInput() {
+  const available = getFilteredQuestions().length;
+  const input = document.getElementById('numQuestions');
+  const startBtn = document.getElementById('startQuizBtn');
+  
+  if (available === 0) {
+    input.value = '';
+    input.placeholder = 'No questions available';
+    input.disabled = true;
+    if (startBtn) startBtn.disabled = true;
+  } else {
+    input.value = available;
+    input.max = available;
+    input.placeholder = `Max: ${available}`;
+    input.disabled = false;
+    if (startBtn) startBtn.disabled = false;
+  }
+}

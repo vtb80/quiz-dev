@@ -1,4 +1,4 @@
-/**
+   /**
  * Answer Handler
  * Collects and validates user answers
  */
@@ -53,10 +53,25 @@ function collectCheckboxAnswer() {
 
 /**
  * Collect fill in the blank answer
+ * Supports both single-blank (old) and multi-blank (new) formats
  */
 function collectFillBlankAnswer() {
-  const input = document.getElementById('fillBlank');
-  return input ? input.value : null;
+  // Check if multi-blank inputs exist
+  const multiInputs = document.querySelectorAll('.fill-blank-multi-input');
+  
+  if (multiInputs.length > 0) {
+    // Multi-blank format - collect all inputs as object
+    const answers = {};
+    multiInputs.forEach(input => {
+      const blankId = input.getAttribute('data-blank-id');
+      answers[blankId] = input.value.trim();
+    });
+    return answers;
+  } else {
+    // Single-blank format - collect single input as string
+    const input = document.getElementById('fillBlank');
+    return input ? input.value.trim() : null;
+  }
 }
 
 /**
@@ -180,14 +195,57 @@ function checkMultipleChoiceMultiple(question, answer) {
 
 /**
  * Check fill in the blank answer
+ * Supports both single-blank (old) and multi-blank (new) formats
  */
 function checkFillInBlank(question, answer) {
+  // Detect format
+  const isMultiBlank = typeof question.correct === 'object' && !Array.isArray(question.correct);
+  
+  if (isMultiBlank) {
+    // Multi-blank format
+    return checkMultiBlankAnswer(question, answer);
+  } else {
+    // Single-blank format (old)
+    return checkSingleBlankAnswer(question, answer);
+  }
+}
+
+/**
+ * Check single-blank answer (old format)
+ */
+function checkSingleBlankAnswer(question, answer) {
   if (!question.correct || !Array.isArray(question.correct)) {
     return false;
   }
   return question.correct.some(c => 
     c.toLowerCase() === (answer || '').toLowerCase()
   );
+}
+
+/**
+ * Check multi-blank answer (new format)
+ */
+function checkMultiBlankAnswer(question, answer) {
+  if (!answer || typeof answer !== 'object') {
+    return false;
+  }
+  
+  // Check all blanks
+  for (const blankId in question.correct) {
+    const acceptableAnswers = question.correct[blankId];
+    const userAnswer = answer[blankId] || '';
+    
+    // Check if user's answer matches any acceptable answer (case-insensitive)
+    const isCorrect = acceptableAnswers.some(acceptable => 
+      acceptable.toLowerCase() === userAnswer.toLowerCase()
+    );
+    
+    if (!isCorrect) {
+      return false;  // If any blank is wrong, entire answer is wrong
+    }
+  }
+  
+  return true;  // All blanks are correct
 }
 
 /**
@@ -247,7 +305,25 @@ export function formatUserAnswer(question, answer) {
       return answer === 0 ? 'True' : 'False';
     
     case 'fill_in_blank':
-      return answer;
+      if (typeof answer === 'object' && answer !== null) {
+     // Multi-blank format
+      const parts = [];
+      const blankIds = Object.keys(answer).sort((a, b) => {
+        const numA = parseInt(a.replace('Q', ''));
+        const numB = parseInt(b.replace('Q', ''));
+        return numA - numB;
+      });
+    
+      blankIds.forEach(blankId => {
+        const displayId = blankId.replace('Q', '');
+        parts.push(`Q${displayId}: ${answer[blankId] || '(empty)'}`);
+      });
+    
+        return parts.join(', ');
+      } else {
+      // Single-blank format
+        return answer || '(empty)';
+      }
     
     case 'matching':
       return Object.values(answer).join(', ');
@@ -293,7 +369,26 @@ export function formatCorrectAnswer(question) {
       return question.correct === 0 ? 'True' : 'False';
     
     case 'fill_in_blank':
-      return question.correct.join(', ');
+      if (typeof question.correct === 'object' && !Array.isArray(question.correct)) {
+      // Multi-blank format
+      const parts = [];
+      const blankIds = Object.keys(question.correct).sort((a, b) => {
+        const numA = parseInt(a.replace('Q', ''));
+        const numB = parseInt(b.replace('Q', ''));
+        return numA - numB;
+      });
+    
+      blankIds.forEach(blankId => {
+        const displayId = blankId.replace('Q', '');
+        const answers = question.correct[blankId].join(' / ');
+        parts.push(`Q${displayId}: ${answers}`);
+      });
+    
+      return parts.join(', ');
+    } else {
+      // Single-blank format
+      return Array.isArray(question.correct) ? question.correct.join(', ') : 'N/A';
+    }
     
     case 'matching':
       return Object.values(question.correct).join(', ');

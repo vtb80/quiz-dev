@@ -4,7 +4,7 @@ Version: 2.3 - Added enabled field for lessons and questions
 """
 
 from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 from shared.constants import DEFAULT_IMAGE_SCALE, DEFAULT_LESSON_ID_PREFIX
 
 
@@ -166,24 +166,68 @@ class TrueFalseQuestion(Question):
 
 @dataclass
 class FillInBlankQuestion(Question):
-    """Fill in the blank question"""
+    """Fill in the blank question - supports single or multiple blanks"""
     question: str = ""
-    correct: List[str] = field(default_factory=list)
+    correct: Union[List[str], Dict[str, List[str]]] = field(default_factory=list)
     
     def __post_init__(self):
         self.type = 'fill_in_blank'
     
+    def is_multi_blank(self) -> bool:
+        """
+        Check if this is a multi-blank question
+        Returns: True if using new dict format, False if old list format
+        """
+        return isinstance(self.correct, dict)
+    
+    def get_blank_count(self) -> int:
+        """
+        Get number of blanks in this question
+        Returns: Number of blanks (1 for old format, len(dict) for new format)
+        """
+        if self.is_multi_blank():
+            return len(self.correct)
+        return 1
+    
+    def get_blank_ids(self) -> List[str]:
+        """
+        Get list of blank IDs in order
+        Returns: ['Q1', 'Q2', ...] for multi-blank, ['Q1'] for single-blank
+        """
+        if self.is_multi_blank():
+            # Sort by numeric value: Q1, Q2, Q10 (not Q1, Q10, Q2)
+            blank_ids = list(self.correct.keys())
+            blank_ids.sort(key=lambda x: int(x.replace('Q', '')))
+            return blank_ids
+        return ['Q1']  # Single blank treated as Q1 for consistency
+    
+    def get_acceptable_answers(self, blank_id: str) -> List[str]:
+        """
+        Get acceptable answers for a specific blank
+        Args:
+            blank_id: Blank identifier (e.g., 'Q1', 'Q2')
+        Returns: List of acceptable answers for that blank
+        """
+        if self.is_multi_blank():
+            return self.correct.get(blank_id, [])
+        # Old format - all answers are for the single blank
+        return self.correct if isinstance(self.correct, list) else []
+    
     @classmethod
     def from_dict(cls, data: dict) -> 'FillInBlankQuestion':
+        """
+        Create FillInBlankQuestion from dictionary
+        Handles both old (list) and new (dict) formats
+        """
         return cls(
             id=data.get('id', 0),
             type='fill_in_blank',
             lessonId=data.get('lessonId'),
-            enabled=data.get('enabled', True),  # NEW
+            enabled=data.get('enabled', True),
             questionImage=data.get('questionImage'),
             questionImageScale=data.get('questionImageScale', DEFAULT_IMAGE_SCALE),
             question=data.get('question', ''),
-            correct=data.get('correct', [])
+            correct=data.get('correct', [])  # Can be list or dict
         )
 
 

@@ -1,16 +1,23 @@
 """
 Fill in the Blank Question Form
 Handles creation and editing of fill in the blank questions
-Version: 1.0
+Version: 2.0 - Added multi-blank support
 """
 
 import tkinter as tk
 from tkinter import ttk
 import os
+import re
 from typing import Optional, Dict, Any, Tuple
 
 from shared.models import Subject, Question, FillInBlankQuestion
 from shared.validators import QuestionValidator
+from shared.constants import (
+    MAX_BLANKS_FILL,
+    BLANK_PLACEHOLDER_PREFIX,
+    BLANK_PLACEHOLDER_SUFFIX,
+    BLANK_PLACEHOLDER_PATTERN
+)
 from admin_tool.dialogs.question_forms.base_form import BaseQuestionForm
 
 # Import image helper
@@ -31,11 +38,15 @@ except ImportError:
 
 
 class FillInBlankForm(BaseQuestionForm):
-    """Form for Fill in the Blank questions"""
+    """Form for Fill in the Blank questions (single or multi-blank)"""
     
     def __init__(self, parent_frame: ttk.Frame, subject: Subject, 
                  lesson_id: Optional[str], mode: str, question: Optional[FillInBlankQuestion] = None):
         super().__init__(parent_frame, subject, lesson_id, mode, question)
+        
+        # Track blank answer widgets
+        self.blank_frames = {}  # {blank_id: frame_widget}
+        self.blank_text_widgets = {}  # {blank_id: text_widget}
         
         # Render and load
         self.render()
@@ -46,20 +57,34 @@ class FillInBlankForm(BaseQuestionForm):
         """Render Fill in the Blank form"""
         # Question text
         ttk.Label(self.parent_frame, text="Question:", font=('', 10, 'bold')).pack(anchor=tk.W, pady=(5, 0))
+        
+        info_text = f"Use {BLANK_PLACEHOLDER_PREFIX}1{BLANK_PLACEHOLDER_SUFFIX}, {BLANK_PLACEHOLDER_PREFIX}2{BLANK_PLACEHOLDER_SUFFIX}, {BLANK_PLACEHOLDER_PREFIX}3{BLANK_PLACEHOLDER_SUFFIX}, etc. for multiple blanks"
+        ttk.Label(self.parent_frame, text=info_text, 
+                 font=('', 9), foreground='blue').pack(anchor=tk.W)
+        
         self.question_text = tk.Text(self.parent_frame, height=4, font=('', 10))
         self.question_text.pack(fill=tk.X, pady=5)
+        
+        # Bind text change to auto-detect blanks
+        self.question_text.bind('<KeyRelease>', self._on_question_text_change)
         
         # Question Image Upload
         if IMAGE_HELPER_AVAILABLE:
             self._add_question_image_control()
         
-        # Answers
-        ttk.Label(self.parent_frame, text="Correct answers (one per line):", 
-                 font=('', 10, 'bold')).pack(anchor=tk.W, pady=(10, 0))
-        ttk.Label(self.parent_frame, text="Enter all acceptable answers (case-insensitive):", 
-                 font=('', 9), foreground='gray').pack(anchor=tk.W)
-        self.answers_text = tk.Text(self.parent_frame, height=8, font=('', 10))
-        self.answers_text.pack(fill=tk.BOTH, expand=True, pady=5)
+        # Blanks section
+        blanks_label_frame = ttk.Frame(self.parent_frame)
+        blanks_label_frame.pack(fill=tk.X, pady=(10, 5))
+        
+        ttk.Label(blanks_label_frame, text="Acceptable Answers for Each Blank:", 
+                 font=('', 10, 'bold')).pack(side=tk.LEFT)
+        
+        # Container for blank answer sections
+        self.blanks_container = ttk.Frame(self.parent_frame)
+        self.blanks_container.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        # Initial blank (Q1)
+        self._add_blank_section('Q1')
     
     def _add_question_image_control(self):
         """Add question image upload control"""
@@ -127,7 +152,6 @@ class FillInBlankForm(BaseQuestionForm):
         
         filepath = self.temp_image_paths['question']
         if not os.path.exists(filepath):
-            # Show warning for missing file
             ttk.Label(preview_frame, text="⚠ Image file not found", 
                      foreground='orange', font=('', 9)).pack(pady=5)
             return
@@ -146,6 +170,75 @@ class FillInBlankForm(BaseQuestionForm):
                 ttk.Label(preview_frame, text=info_text, font=('', 8), 
                          foreground='gray').pack()
     
+    def _on_question_text_change(self, event=None):
+        """
+        Auto-detect blanks from question text and add/remove sections accordingly
+        """
+        question_text = self.question_text.get('1.0', tk.END).strip()
+        
+        # Find all blanks in text
+        matches = re.findall(BLANK_PLACEHOLDER_PATTERN, question_text)
+        detected_blank_ids = [f'Q{num}' for num in matches]
+        
+        # Get current blank sections
+        current_blank_ids = list(self.blank_frames.keys())
+        
+        # Add missing blanks
+        for blank_id in detected_blank_ids:
+            if blank_id not in current_blank_ids:
+                self._add_blank_section(blank_id)
+        
+        # Remove blanks not in text (but keep Q1 if it's the only one)
+        if len(detected_blank_ids) == 0:
+            # No blanks detected - keep Q1 for single-blank mode
+            for blank_id in current_blank_ids:
+                if blank_id != 'Q1':
+                    self._remove_blank_section(blank_id)
+        else:
+            for blank_id in current_blank_ids:
+                if blank_id not in detected_blank_ids:
+                    self._remove_blank_section(blank_id)
+    
+    def _add_blank_section(self, blank_id: str):
+        """
+        Add a blank answer section
+        Args:
+            blank_id: Blank identifier (e.g., 'Q1', 'Q2')
+        """
+        if blank_id in self.blank_frames:
+            return  # Already exists
+        
+        # Create frame for this blank
+        frame = ttk.LabelFrame(self.blanks_container, 
+                               text=f"{BLANK_PLACEHOLDER_PREFIX}{blank_id.replace('Q', '')}{BLANK_PLACEHOLDER_SUFFIX}")
+        frame.pack(fill=tk.X, pady=5, padx=5)
+        
+        ttk.Label(frame, text="Acceptable answers (one per line):", 
+                 font=('', 9)).pack(anchor=tk.W, padx=5, pady=(5, 0))
+        
+        text_widget = tk.Text(frame, height=6, font=('', 10))
+        text_widget.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Store references
+        self.blank_frames[blank_id] = frame
+        self.blank_text_widgets[blank_id] = text_widget
+    
+    def _remove_blank_section(self, blank_id: str):
+        """
+        Remove a blank answer section
+        Args:
+            blank_id: Blank identifier to remove
+        """
+        if blank_id not in self.blank_frames:
+            return
+        
+        # Destroy frame
+        self.blank_frames[blank_id].destroy()
+        
+        # Remove references
+        del self.blank_frames[blank_id]
+        del self.blank_text_widgets[blank_id]
+    
     def load_data(self):
         """Load data from question object (edit mode)"""
         if not self.question:
@@ -156,7 +249,6 @@ class FillInBlankForm(BaseQuestionForm):
         
         # Load question image
         if IMAGE_HELPER_AVAILABLE and hasattr(self.question, 'questionImage') and self.question.questionImage:
-            # Path already saved in JSON - keep as-is
             self.temp_image_paths['question'] = self.question.questionImage
             self.image_controls['question']['path_var'].set(os.path.basename(self.question.questionImage))
             
@@ -165,8 +257,19 @@ class FillInBlankForm(BaseQuestionForm):
             
             self._update_question_image_preview()
         
-        # Load answers
-        self.answers_text.insert('1.0', '\n'.join(self.question.correct))
+        # Trigger blank detection from question text
+        self._on_question_text_change()
+        
+        # Load answers into appropriate blanks
+        if self.question.is_multi_blank():
+            # New format - dict
+            for blank_id, answers in self.question.correct.items():
+                if blank_id in self.blank_text_widgets:
+                    self.blank_text_widgets[blank_id].insert('1.0', '\n'.join(answers))
+        else:
+            # Old format - list (single blank)
+            if 'Q1' in self.blank_text_widgets:
+                self.blank_text_widgets['Q1'].insert('1.0', '\n'.join(self.question.correct))
     
     def collect_data(self) -> Optional[Dict[str, Any]]:
         """Collect data from form"""
@@ -176,15 +279,13 @@ class FillInBlankForm(BaseQuestionForm):
             # Question text
             data['question'] = self.question_text.get('1.0', tk.END).strip()
             
-            # Question image - CRITICAL PATH HANDLING
+            # Question image
             if 'question' in self.temp_image_paths:
                 img_path = self.temp_image_paths['question']
-                # If editing and path already saved (starts with 'images/'), keep it
                 if img_path.startswith('images/'):
                     data['questionImage'] = img_path
                     data['questionImageScale'] = self.image_controls['question']['scale_var'].get()
                 else:
-                    # New image - needs to be copied
                     q_id = self.question.id if self.question else None
                     if q_id:
                         rel_path = copy_image_to_subject(img_path, self.subject.name, q_id, 'main')
@@ -194,10 +295,30 @@ class FillInBlankForm(BaseQuestionForm):
                                 self.image_controls['question']['scale_var'].get()
                             )
             
-            # Answers
-            data['answers'] = [a.strip() for a in 
-                              self.answers_text.get('1.0', tk.END).split('\n') 
-                              if a.strip()]
+            # Detect blanks in question text
+            question_text = data['question']
+            matches = re.findall(BLANK_PLACEHOLDER_PATTERN, question_text)
+            detected_blank_ids = [f'Q{num}' for num in matches]
+            
+            # Collect answers
+            if len(detected_blank_ids) == 0:
+                # Single-blank mode (old format) - no _Q1_ in text
+                data['is_multi_blank'] = False
+                answers_list = [a.strip() for a in 
+                               self.blank_text_widgets['Q1'].get('1.0', tk.END).split('\n') 
+                               if a.strip()]
+                data['answers'] = answers_list
+            else:
+                # Multi-blank mode (new format)
+                data['is_multi_blank'] = True
+                answers_dict = {}
+                for blank_id in detected_blank_ids:
+                    if blank_id in self.blank_text_widgets:
+                        answers_list = [a.strip() for a in 
+                                       self.blank_text_widgets[blank_id].get('1.0', tk.END).split('\n') 
+                                       if a.strip()]
+                        answers_dict[blank_id] = answers_list
+                data['answers'] = answers_dict
             
             return data
             
@@ -212,14 +333,15 @@ class FillInBlankForm(BaseQuestionForm):
         if not question_text:
             return False, "Question text is required"
         
-        # Validate answers
-        answers = [a.strip() for a in self.answers_text.get('1.0', tk.END).split('\n') if a.strip()]
+        # Collect data to validate
+        data = self.collect_data()
+        if not data:
+            return False, "Failed to collect form data"
         
-        if len(answers) < 1:
-            return False, "At least one correct answer is required"
+        # Use shared validator
+        is_valid, error = QuestionValidator.validate_fill_in_blank(
+            data['question'],
+            data['answers']
+        )
         
-        for i, ans in enumerate(answers):
-            if not ans:
-                return False, f"Answer {i+1} is empty"
-        
-        return True, ""
+        return is_valid, error

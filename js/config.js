@@ -27,7 +27,7 @@ export const CONFIG = {
 
   // Default settings
   DEFAULTS: {
-    NUM_QUESTIONS: 5,
+  //NUM_QUESTIONS: 5,
     MIN_QUESTIONS: 1,
     MAX_QUESTIONS: 100
   }

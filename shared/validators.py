@@ -91,13 +91,35 @@ class QuestionValidator:
         return True, ""
     
     @staticmethod
-    def validate_fill_in_blank(question_text: str, answers: List[str]) -> Tuple[bool, str]:
+    def validate_fill_in_blank(question_text: str, answers) -> Tuple[bool, str]:
         """
         Validate fill in the blank question
+        Supports both old (list) and new (dict) formats
         Returns: (is_valid, error_message)
         """
         if not question_text or not question_text.strip():
             return False, "Question text is required"
+        
+        # Check format type
+        is_multi_blank = isinstance(answers, dict)
+        
+        if is_multi_blank:
+            # New multi-blank format validation
+            return QuestionValidator._validate_multi_blank(question_text, answers)
+        else:
+            # Old single-blank format validation
+            return QuestionValidator._validate_single_blank(answers)
+
+    @staticmethod
+    def _validate_single_blank(answers: List[str]) -> Tuple[bool, str]:
+        """
+        Validate single-blank format (old format)
+        Args:
+            answers: List of acceptable answers
+        Returns: (is_valid, error_message)
+        """
+        if not isinstance(answers, list):
+            return False, "Answers must be a list for single-blank questions"
         
         if len(answers) < MIN_ANSWERS_FILL:
             return False, f"Need at least {MIN_ANSWERS_FILL} acceptable answer"
@@ -106,6 +128,142 @@ class QuestionValidator:
         for i, ans in enumerate(answers):
             if not ans or not ans.strip():
                 return False, f"Answer {i+1} is empty"
+        
+        return True, ""
+
+        @staticmethod
+        def _validate_multi_blank(question_text: str, answers: Dict[str, List[str]]) -> Tuple[bool, str]:
+            """
+            Validate multi-blank format (new format)
+            Args:
+                question_text: Question text with _Q1_, _Q2_ placeholders
+                answers: Dict mapping blank IDs to lists of acceptable answers
+            Returns: (is_valid, error_message)
+            """
+            import re
+            from shared.constants import (
+                MAX_BLANKS_FILL, 
+                BLANK_PLACEHOLDER_PATTERN,
+                BLANK_PLACEHOLDER_PREFIX,
+                BLANK_PLACEHOLDER_SUFFIX
+            )
+            
+            if not isinstance(answers, dict):
+                return False, "Answers must be a dictionary for multi-blank questions"
+            
+            if len(answers) == 0:
+                return False, "At least one blank is required"
+            
+            if len(answers) > MAX_BLANKS_FILL:
+                return False, f"Maximum {MAX_BLANKS_FILL} blanks allowed, found {len(answers)}"
+            
+            # Extract blank IDs from question text
+            placeholders_in_text = re.findall(BLANK_PLACEHOLDER_PATTERN, question_text)
+            placeholder_ids = [f'Q{num}' for num in placeholders_in_text]
+            
+            if len(placeholder_ids) == 0:
+                return False, f"No blanks found in question text. Use format: {BLANK_PLACEHOLDER_PREFIX}1{BLANK_PLACEHOLDER_SUFFIX}, {BLANK_PLACEHOLDER_PREFIX}2{BLANK_PLACEHOLDER_SUFFIX}, etc."
+            
+            # Get blank IDs from answers dict
+            answer_blank_ids = list(answers.keys())
+            
+            # Check if all placeholders in text have corresponding answers
+            for pid in placeholder_ids:
+                if pid not in answer_blank_ids:
+                    return False, f"Blank '{BLANK_PLACEHOLDER_PREFIX}{pid.replace('Q', '')}{BLANK_PLACEHOLDER_SUFFIX}' found in question text but no answers provided"
+            
+            # Check if all answers have corresponding placeholders in text
+            for aid in answer_blank_ids:
+                if aid not in placeholder_ids:
+                    return False, f"Answers provided for '{BLANK_PLACEHOLDER_PREFIX}{aid.replace('Q', '')}{BLANK_PLACEHOLDER_SUFFIX}' but blank not found in question text"
+            
+            # Validate consecutive numbering (Q1, Q2, Q3... no gaps)
+            blank_numbers = sorted([int(bid.replace('Q', '')) for bid in answer_blank_ids])
+            expected_numbers = list(range(1, len(blank_numbers) + 1))
+            
+            if blank_numbers != expected_numbers:
+                return False, f"Blank numbering must be consecutive starting from 1. Expected: Q{', Q'.join(map(str, expected_numbers))}, Found: Q{', Q'.join(map(str, blank_numbers))}"
+            
+            # Validate each blank's answers
+            for blank_id, acceptable_answers in answers.items():
+                if not isinstance(acceptable_answers, list):
+                    return False, f"Answers for {BLANK_PLACEHOLDER_PREFIX}{blank_id.replace('Q', '')}{BLANK_PLACEHOLDER_SUFFIX} must be a list"
+                
+                if len(acceptable_answers) < MIN_ANSWERS_FILL:
+                    return False, f"{BLANK_PLACEHOLDER_PREFIX}{blank_id.replace('Q', '')}{BLANK_PLACEHOLDER_SUFFIX} needs at least {MIN_ANSWERS_FILL} acceptable answer"
+                
+                # Check for empty answers
+                for i, ans in enumerate(acceptable_answers):
+                    if not ans or not ans.strip():
+                        return False, f"{BLANK_PLACEHOLDER_PREFIX}{blank_id.replace('Q', '')}{BLANK_PLACEHOLDER_SUFFIX} answer {i+1} is empty"
+            
+            return True, ""
+    
+    @staticmethod
+    def _validate_multi_blank(question_text: str, answers: Dict[str, List[str]]) -> Tuple[bool, str]:
+        """
+        Validate multi-blank format (new format)
+        Args:
+            question_text: Question text with _Q1_, _Q2_ placeholders
+            answers: Dict mapping blank IDs to lists of acceptable answers
+        Returns: (is_valid, error_message)
+        """
+        import re
+        from shared.constants import (
+            MAX_BLANKS_FILL, 
+            BLANK_PLACEHOLDER_PATTERN,
+            BLANK_PLACEHOLDER_PREFIX,
+            BLANK_PLACEHOLDER_SUFFIX
+        )
+        
+        if not isinstance(answers, dict):
+            return False, "Answers must be a dictionary for multi-blank questions"
+        
+        if len(answers) == 0:
+            return False, "At least one blank is required"
+        
+        if len(answers) > MAX_BLANKS_FILL:
+            return False, f"Maximum {MAX_BLANKS_FILL} blanks allowed, found {len(answers)}"
+        
+        # Extract blank IDs from question text
+        placeholders_in_text = re.findall(BLANK_PLACEHOLDER_PATTERN, question_text)
+        placeholder_ids = [f'Q{num}' for num in placeholders_in_text]
+        
+        if len(placeholder_ids) == 0:
+            return False, f"No blanks found in question text. Use format: {BLANK_PLACEHOLDER_PREFIX}1{BLANK_PLACEHOLDER_SUFFIX}, {BLANK_PLACEHOLDER_PREFIX}2{BLANK_PLACEHOLDER_SUFFIX}, etc."
+        
+        # Get blank IDs from answers dict
+        answer_blank_ids = list(answers.keys())
+        
+        # Check if all placeholders in text have corresponding answers
+        for pid in placeholder_ids:
+            if pid not in answer_blank_ids:
+                return False, f"Blank '{BLANK_PLACEHOLDER_PREFIX}{pid.replace('Q', '')}{BLANK_PLACEHOLDER_SUFFIX}' found in question text but no answers provided"
+        
+        # Check if all answers have corresponding placeholders in text
+        for aid in answer_blank_ids:
+            if aid not in placeholder_ids:
+                return False, f"Answers provided for '{BLANK_PLACEHOLDER_PREFIX}{aid.replace('Q', '')}{BLANK_PLACEHOLDER_SUFFIX}' but blank not found in question text"
+        
+        # Validate consecutive numbering (Q1, Q2, Q3... no gaps)
+        blank_numbers = sorted([int(bid.replace('Q', '')) for bid in answer_blank_ids])
+        expected_numbers = list(range(1, len(blank_numbers) + 1))
+        
+        if blank_numbers != expected_numbers:
+            return False, f"Blank numbering must be consecutive starting from 1. Expected: Q{', Q'.join(map(str, expected_numbers))}, Found: Q{', Q'.join(map(str, blank_numbers))}"
+        
+        # Validate each blank's answers
+        for blank_id, acceptable_answers in answers.items():
+            if not isinstance(acceptable_answers, list):
+                return False, f"Answers for {BLANK_PLACEHOLDER_PREFIX}{blank_id.replace('Q', '')}{BLANK_PLACEHOLDER_SUFFIX} must be a list"
+            
+            if len(acceptable_answers) < MIN_ANSWERS_FILL:
+                return False, f"{BLANK_PLACEHOLDER_PREFIX}{blank_id.replace('Q', '')}{BLANK_PLACEHOLDER_SUFFIX} needs at least {MIN_ANSWERS_FILL} acceptable answer"
+            
+            # Check for empty answers
+            for i, ans in enumerate(acceptable_answers):
+                if not ans or not ans.strip():
+                    return False, f"{BLANK_PLACEHOLDER_PREFIX}{blank_id.replace('Q', '')}{BLANK_PLACEHOLDER_SUFFIX} answer {i+1} is empty"
         
         return True, ""
     

@@ -192,16 +192,78 @@ function renderTrueFalse(question) {
 /**
  * Render Fill in the Blank question
  */
+/**
+ * Render Fill in the Blank question
+ * Supports both single-blank (old) and multi-blank (new) formats
+ */
 function renderFillInBlank(question) {
-  const answer = state.getCurrentAnswer() || '';
+  const answer = state.getCurrentAnswer() || {};
   let html = `<h3>${question.question}</h3>`;
   
   // Add question image if present
   html += renderQuestionImage(question);
   
-  html += `
-    <input type="text" id="fillBlank" class="fill-blank-input" value="${answer}" placeholder="Type your answer here...">
+  // Detect format: old (array) vs new (object)
+  const isMultiBlank = typeof question.correct === 'object' && !Array.isArray(question.correct);
+  
+  if (isMultiBlank) {
+    // New multi-blank format
+    html += renderMultiBlankInputs(question, answer);
+  } else {
+    // Old single-blank format
+    html += renderSingleBlankInput(answer);
+  }
+  
+  return html;
+}
+
+/**
+ * Render single blank input (old format)
+ */
+function renderSingleBlankInput(answer) {
+  const value = typeof answer === 'string' ? answer : '';
+  return `
+    <input type="text" 
+           id="fillBlank" 
+           class="fill-blank-input" 
+           value="${value}" 
+           placeholder="Type your answer here...">
   `;
+}
+
+/**
+ * Render multiple blank inputs (new format)
+ */
+function renderMultiBlankInputs(question, answer) {
+  // Extract blank IDs from question.correct
+  const blankIds = Object.keys(question.correct);
+  
+  // Sort numerically: Q1, Q2, Q10 (not Q1, Q10, Q2)
+  blankIds.sort((a, b) => {
+    const numA = parseInt(a.replace('Q', ''));
+    const numB = parseInt(b.replace('Q', ''));
+    return numA - numB;
+  });
+  
+  let html = '<div class="fill-blank-multi-container">';
+  
+  blankIds.forEach(blankId => {
+    const value = (typeof answer === 'object' && answer[blankId]) ? answer[blankId] : '';
+    const displayId = blankId.replace('Q', '');
+    
+    html += `
+      <div class="fill-blank-multi-item">
+        <label class="fill-blank-label">Q${displayId}:</label>
+        <input type="text" 
+               class="fill-blank-input fill-blank-multi-input" 
+               data-blank-id="${blankId}"
+               value="${value}" 
+               placeholder="Type answer for Q${displayId}...">
+      </div>
+    `;
+  });
+  
+  html += '</div>';
   
   return html;
 }

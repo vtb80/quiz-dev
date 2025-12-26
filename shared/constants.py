@@ -1,17 +1,17 @@
 """
 Shared Constants and Configuration
-Version: 2.2 - Added multiple_choice_multiple type
+Version: 2.3 - Added multi-blank fill-in-the-blank constants
 """
 
 # Application Info
 APP_NAME = "Quiz Admin"
-APP_VERSION = "2.2"
+APP_VERSION = "2.3"
 APP_TITLE = f"{APP_NAME} v{APP_VERSION} - Modular Edition"
 
 # Question Types
 QUESTION_TYPES = [
     "multiple_choice",
-    "multiple_choice_multiple",  # NEW
+    "multiple_choice_multiple",
     "true_false",
     "fill_in_blank",
     "matching",
@@ -21,7 +21,7 @@ QUESTION_TYPES = [
 
 QUESTION_TYPE_NAMES = {
     'multiple_choice': 'Multiple Choice',
-    'multiple_choice_multiple': 'Multiple Choice (Multiple Answers)',  # NEW
+    'multiple_choice_multiple': 'Multiple Choice (Multiple Answers)',
     'true_false': 'True/False',
     'fill_in_blank': 'Fill in the Blank',
     'matching': 'Matching',
@@ -31,7 +31,7 @@ QUESTION_TYPE_NAMES = {
 
 QUESTION_TYPE_ICONS = {
     'multiple_choice': 'MC',
-    'multiple_choice_multiple': 'MCM',  # NEW
+    'multiple_choice_multiple': 'MCM',
     'true_false': 'TF',
     'fill_in_blank': 'FILL',
     'matching': 'MATCH',
@@ -73,7 +73,13 @@ MIN_PAIRS_MATCHING = 2
 MIN_ITEMS_REORDERING = 2
 MIN_ANSWERS_FILL = 1
 MIN_SUBQUESTIONS_READING = 1
-MIN_CORRECT_ANSWERS_MCM = 1  # NEW - At least 1 correct answer required
+MIN_CORRECT_ANSWERS_MCM = 1
+
+# NEW: Fill in the Blank - Multi-Blank Support
+MAX_BLANKS_FILL = 10  # Maximum number of blanks allowed
+BLANK_PLACEHOLDER_PREFIX = "_Q"  # Placeholder format: _Q1_, _Q2_, etc.
+BLANK_PLACEHOLDER_SUFFIX = "_"
+BLANK_PLACEHOLDER_PATTERN = r'_Q(\d+)_'  # Regex pattern for validation
 
 # Default Values
 DEFAULT_NUM_QUESTIONS = 5

@@ -227,10 +227,22 @@ class DetailsPanel:
         
         elif q.type == "fill_in_blank":
             text += f"Question:\n{q.question}\n\n"
-            text += "Accepted Answers:\n"
-            for ans in q.correct:
-                text += f"  • {ans}\n"
-        
+            # Check if multi-blank or single-blank
+            if q.is_multi_blank():
+                # Multi-blank format (new)
+                text += "Acceptable Answers (Multi-Blank):\n"
+                blank_ids = q.get_blank_ids()
+                for blank_id in blank_ids:
+                    answers = q.get_acceptable_answers(blank_id)
+                    text += f"\n  _Q{blank_id.replace('Q', '')}_:\n"
+                    for ans in answers:
+                        text += f"    • {ans}\n"
+            else:
+                # Single-blank format (old)
+                text += "Accepted Answers:\n"
+                answers = q.get_acceptable_answers('Q1')
+                for ans in answers:
+                    text += f"  • {ans}\n"
         elif q.type == "matching":
             text += f"Question:\n{q.question}\n\n"
             text += "Pairs:\n"

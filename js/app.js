@@ -22,6 +22,7 @@ import {
   updateLessonDropdown, 
   updateQuestionTypeDropdown, 
   getFilteredQuestions,
+  updateQuestionNumberInput,
   updateInfoText,
   shuffleArray 
 } from './filters.js';
@@ -77,10 +78,12 @@ function setupEventListeners() {
   document.getElementById('lessonFilter').addEventListener('change', () => {
     updateQuestionTypeDropdown();
     updateInfoText();
+	updateQuestionNumberInput();
   });
   
   document.getElementById('typeFilter').addEventListener('change', () => {
     updateInfoText();
+	updateQuestionNumberInput();
   });
   
   document.getElementById('backToSubjectsBtn').addEventListener('click', handleBackToSubjects);
@@ -114,6 +117,7 @@ async function handleSelectSubject() {
     // Update UI
     updateLessonDropdown();
     updateQuestionTypeDropdown();
+	updateQuestionNumberInput();
     
     // Show quiz setup screen
     showScreen('quizSetup');
@@ -133,7 +137,8 @@ function handleBackToSubjects() {
     document.getElementById('subject').value = '';
     document.getElementById('lessonFilter').value = '';
     document.getElementById('typeFilter').value = '';
-    document.getElementById('numQuestions').value = CONFIG.DEFAULTS.NUM_QUESTIONS;
+    document.getElementById('numQuestions').value = '';
+	document.getElementById('numQuestions').placeholder = 'Select a subject first';
     
     // Clear state
     state.reset();
@@ -249,7 +254,8 @@ function handleExitQuiz() {
     document.getElementById('subject').value = '';
     document.getElementById('lessonFilter').value = '';
     document.getElementById('typeFilter').value = '';
-    document.getElementById('numQuestions').value = CONFIG.DEFAULTS.NUM_QUESTIONS;
+    document.getElementById('numQuestions').value = '';
+	document.getElementById('numQuestions').placeholder = 'Select a subject first';
     
     state.reset();
     showScreen('subjectSetup');
@@ -264,7 +270,8 @@ function handleRetakeQuiz() {
   document.getElementById('subject').value = '';
   document.getElementById('lessonFilter').value = '';
   document.getElementById('typeFilter').value = '';
-  document.getElementById('numQuestions').value = CONFIG.DEFAULTS.NUM_QUESTIONS;
+  document.getElementById('numQuestions').value = '';
+  document.getElementById('numQuestions').placeholder = 'Select a subject first';
   
   // Clear state
   state.reset();
