@@ -5,6 +5,7 @@
 
 import { getQuestionTypeName } from './config.js';
 import { state } from './state.js';
+import { formatUserAnswer, formatCorrectAnswer } from './answer-handler.js';
 
 /**
  * Show a specific screen and hide others
@@ -71,6 +72,36 @@ export function showFeedback(isCorrect) {
   }
   
   feedbackDiv.classList.add('show');
+  
+  // Show second badge above Continue button
+  showSecondBadge(isCorrect);
+}
+
+/**
+ * Show second feedback badge above the Continue button
+ */
+function showSecondBadge(isCorrect) {
+  const container = document.getElementById('questionContainer');
+  
+  // Remove existing badge if any
+  const existingBadge = document.getElementById('feedbackBadge2');
+  if (existingBadge) {
+    existingBadge.remove();
+  }
+  
+  // Create second badge
+  const badgeDiv = document.createElement('div');
+  badgeDiv.id = 'feedbackBadge2';
+  badgeDiv.className = 'feedback show';
+  badgeDiv.classList.add(isCorrect ? 'feedback-correct' : 'feedback-incorrect');
+  
+  if (isCorrect) {
+    badgeDiv.textContent = '✓ Correct!';
+  } else {
+    badgeDiv.textContent = '✗ Incorrect';
+  }
+  
+  container.appendChild(badgeDiv);
 }
 
 /**
@@ -80,6 +111,12 @@ export function clearFeedback() {
   const feedbackDiv = document.getElementById('feedback');
   feedbackDiv.classList.remove('show', 'feedback-correct', 'feedback-incorrect');
   feedbackDiv.textContent = '';
+  
+  // Remove second badge
+  const existingBadge = document.getElementById('feedbackBadge2');
+  if (existingBadge) {
+    existingBadge.remove();
+  }
 }
 
 /**
