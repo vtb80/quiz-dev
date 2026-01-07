@@ -1,6 +1,7 @@
 /**
  * Question Renderer
  * Renders different question types to HTML
+ * Version: 2.1 - Added Dropdown support
  */
 
 import { shuffleArray } from './filters.js';
@@ -15,6 +16,7 @@ export function renderQuestion(question) {
     'multiple_choice_multiple': renderMultipleChoiceMultiple,
     'true_false': renderTrueFalse,
     'fill_in_blank': renderFillInBlank,
+    'dropdown': renderDropdown,
     'matching': renderMatching,
     'reordering': renderReordering,
     'reading_comprehension': renderReadingComprehension
@@ -175,7 +177,12 @@ function renderTrueFalse(question) {
   ];
   const shuffledOptions = shuffleArray(options);
   
-  let html = `<h3>${question.question}</h3><div class="true-false">`;
+  let html = `<h3>${question.question}</h3>`;
+  
+  // Add question image if present
+  html += renderQuestionImage(question);
+  
+  html += '<div class="true-false">';
   shuffledOptions.forEach(opt => {
     const isSelected = userAnswer === opt.value;
     html += `
@@ -189,9 +196,6 @@ function renderTrueFalse(question) {
   return html + '</div>';
 }
 
-/**
- * Render Fill in the Blank question
- */
 /**
  * Render Fill in the Blank question
  * Supports both single-blank (old) and multi-blank (new) formats
@@ -269,11 +273,68 @@ function renderMultiBlankInputs(question, answer) {
 }
 
 /**
+ * Render Drop-Down Selection question
+ * Replaces [DD1], [DD2] placeholders with actual dropdown elements
+ */
+function renderDropdown(question) {
+  const answer = state.getCurrentAnswer() || {};
+  
+  // Add question image if present
+  let html = renderQuestionImage(question);
+  
+  // Start question text container
+  html += '<div class="dropdown-question-container" style="font-size: 18px; line-height: 2;">';
+  
+  // Get dropdown IDs in order
+  const dropdownIds = Object.keys(question.dropdowns).sort((a, b) => {
+    return parseInt(a.replace('DD', '')) - parseInt(b.replace('DD', ''));
+  });
+  
+  // Process question text and replace placeholders
+  let questionText = question.question;
+  
+  dropdownIds.forEach(ddId => {
+    const ddNum = ddId.replace('DD', '');
+    const placeholder = `[DD${ddNum}]`;
+    const ddData = question.dropdowns[ddId];
+    const selectedValue = answer[ddId] !== undefined ? answer[ddId] : '';
+    
+    // Shuffle options
+    const optionsWithIdx = ddData.options.map((opt, idx) => ({ opt, idx }));
+    const shuffled = shuffleArray(optionsWithIdx);
+    
+    // Build dropdown HTML
+    let dropdownHtml = `<select class="dropdown-select" data-dd-id="${ddId}" style="margin: 0 5px; padding: 8px 12px; font-size: 16px; border: 2px solid #667eea; border-radius: 5px; background: white; cursor: pointer; min-width: 120px;">`;
+    dropdownHtml += '<option value="">-- Select --</option>';
+    
+    shuffled.forEach(item => {
+      const selected = selectedValue === item.idx ? 'selected' : '';
+      dropdownHtml += `<option value="${item.idx}" ${selected}>${item.opt}</option>`;
+    });
+    
+    dropdownHtml += '</select>';
+    
+    // Replace placeholder with dropdown
+    questionText = questionText.replace(placeholder, dropdownHtml);
+  });
+  
+  html += questionText;
+  html += '</div>';
+  
+  return html;
+}
+
+/**
  * Render Matching question
  */
 function renderMatching(question) {
   const currentAnswer = state.getCurrentAnswer() || {};
-  let html = `<h3>${question.question}</h3><div class="matching-container">`;
+  let html = `<h3>${question.question}</h3>`;
+  
+  // Add question image if present
+  html += renderQuestionImage(question);
+  
+  html += '<div class="matching-container">';
   
   const shuffledPairs = shuffleArray([...question.pairs]);
   const shuffledOptions = shuffleArray([...question.pairs]);
@@ -302,7 +363,12 @@ function renderMatching(question) {
  * Render Reordering question
  */
 function renderReordering(question) {
-  let html = `<h3>${question.question}</h3><div class="reordering-container" id="reorderList">`;
+  let html = `<h3>${question.question}</h3>`;
+  
+  // Add question image if present
+  html += renderQuestionImage(question);
+  
+  html += '<div class="reordering-container" id="reorderList">';
   
   const items = question.items.map((item, idx) => ({ ...item, originalIdx: idx }));
   const shuffledItems = shuffleArray(items);
@@ -325,6 +391,9 @@ function renderReordering(question) {
 function renderReadingComprehension(question) {
   const currentAnswer = state.getCurrentAnswer() || {};
   let html = `<div class="passage">${question.passage}</div>`;
+  
+  // Add question image if present
+  html += renderQuestionImage(question);
   
   question.questions.forEach((subQ, idx) => {
     html += `<h4 style="margin-top: 20px; margin-bottom: 10px;">Question ${idx + 1}: ${subQ.question}</h4>`;

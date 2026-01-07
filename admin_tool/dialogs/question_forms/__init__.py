@@ -1,7 +1,7 @@
 """
 Question Forms Package
 Modular question type form implementations
-Version: 2.2 - Added MultipleChoiceMultipleForm
+Version: 2.3 - Added DropdownForm
 """
 
 from .base_form import BaseQuestionForm
@@ -12,6 +12,7 @@ from .fill_blank_form import FillInBlankForm
 from .matching_form import MatchingForm
 from .reordering_form import ReorderingForm
 from .reading_comp_form import ReadingComprehensionForm
+from .dropdown_form import DropdownForm
 
 __all__ = [
     'BaseQuestionForm',
@@ -22,4 +23,5 @@ __all__ = [
     'MatchingForm',
     'ReorderingForm',
     'ReadingComprehensionForm',
+    'DropdownForm',
 ]

@@ -1,6 +1,7 @@
-   /**
+/**
  * Answer Handler
  * Collects and validates user answers
+ * Version: 2.1 - Added Dropdown support
  */
 
 import { state } from './state.js';
@@ -19,6 +20,9 @@ export function collectAnswer(question) {
     
     case 'fill_in_blank':
       return collectFillBlankAnswer();
+    
+    case 'dropdown':
+      return collectDropdownAnswer();
     
     case 'matching':
       return collectMatchingAnswer();
@@ -75,6 +79,25 @@ function collectFillBlankAnswer() {
 }
 
 /**
+ * Collect dropdown answer
+ * Returns object mapping dropdown IDs to selected indices
+ */
+function collectDropdownAnswer() {
+  const answer = {};
+  const dropdowns = document.querySelectorAll('.dropdown-select');
+  
+  dropdowns.forEach(select => {
+    const ddId = select.getAttribute('data-dd-id');
+    const value = select.value;
+    
+    // Store as integer if selected, null if not
+    answer[ddId] = value !== '' ? parseInt(value) : null;
+  });
+  
+  return answer;
+}
+
+/**
  * Collect matching answer
  */
 function collectMatchingAnswer() {
@@ -120,6 +143,14 @@ export function validateAnswer(question, answer) {
     }
   }
   
+  // Special validation for dropdown
+  if (question.type === 'dropdown') {
+    const allSelected = Object.values(answer).every(v => v !== null && v !== '');
+    if (!allSelected) {
+      return { valid: false, message: 'Please select an answer for all dropdowns' };
+    }
+  }
+  
   // Special validation for reading comprehension
   if (question.type === 'reading_comprehension') {
     const hasAllAnswers = Object.values(answer).every(v => v !== null);
@@ -153,6 +184,9 @@ export function checkAnswer(question, answer) {
     
     case 'fill_in_blank':
       return checkFillInBlank(question, answer);
+    
+    case 'dropdown':
+      return checkDropdown(question, answer);
     
     case 'matching':
       return checkMatching(question, answer);
@@ -249,6 +283,28 @@ function checkMultiBlankAnswer(question, answer) {
 }
 
 /**
+ * Check dropdown answer
+ * All dropdowns must have correct selection
+ */
+function checkDropdown(question, answer) {
+  if (!answer || typeof answer !== 'object') {
+    return false;
+  }
+  
+  // Check each dropdown
+  for (const ddId in question.dropdowns) {
+    const correct = question.dropdowns[ddId].correct;
+    
+    // User's answer must match correct index
+    if (answer[ddId] !== correct) {
+      return false;
+    }
+  }
+  
+  return true;  // All dropdowns correct
+}
+
+/**
  * Check matching answer
  */
 function checkMatching(question, answer) {
@@ -306,24 +362,49 @@ export function formatUserAnswer(question, answer) {
     
     case 'fill_in_blank':
       if (typeof answer === 'object' && answer !== null) {
-     // Multi-blank format
-      const parts = [];
-      const blankIds = Object.keys(answer).sort((a, b) => {
-        const numA = parseInt(a.replace('Q', ''));
-        const numB = parseInt(b.replace('Q', ''));
-        return numA - numB;
-      });
-    
-      blankIds.forEach(blankId => {
-        const displayId = blankId.replace('Q', '');
-        parts.push(`Q${displayId}: ${answer[blankId] || '(empty)'}`);
-      });
-    
+        // Multi-blank format
+        const parts = [];
+        const blankIds = Object.keys(answer).sort((a, b) => {
+          const numA = parseInt(a.replace('Q', ''));
+          const numB = parseInt(b.replace('Q', ''));
+          return numA - numB;
+        });
+        
+        blankIds.forEach(blankId => {
+          const displayId = blankId.replace('Q', '');
+          parts.push(`Q${displayId}: ${answer[blankId] || '(empty)'}`);
+        });
+        
         return parts.join(', ');
       } else {
-      // Single-blank format
+        // Single-blank format
         return answer || '(empty)';
       }
+    
+    case 'dropdown':
+      if (!answer || typeof answer !== 'object') {
+        return 'No answer provided';
+      }
+      
+      const parts = [];
+      const ddIds = Object.keys(question.dropdowns).sort((a, b) => {
+        return parseInt(a.replace('DD', '')) - parseInt(b.replace('DD', ''));
+      });
+      
+      ddIds.forEach(ddId => {
+        const displayId = ddId.replace('DD', '');
+        const answerIdx = answer[ddId];
+        
+        if (answerIdx !== null && answerIdx !== undefined) {
+          const options = question.dropdowns[ddId].options;
+          const answerText = options[answerIdx] || '(invalid)';
+          parts.push(`DD${displayId}: ${answerText}`);
+        } else {
+          parts.push(`DD${displayId}: (not selected)`);
+        }
+      });
+      
+      return parts.join(', ');
     
     case 'matching':
       return Object.values(answer).join(', ');
@@ -370,25 +451,45 @@ export function formatCorrectAnswer(question) {
     
     case 'fill_in_blank':
       if (typeof question.correct === 'object' && !Array.isArray(question.correct)) {
-      // Multi-blank format
+        // Multi-blank format
+        const parts = [];
+        const blankIds = Object.keys(question.correct).sort((a, b) => {
+          const numA = parseInt(a.replace('Q', ''));
+          const numB = parseInt(b.replace('Q', ''));
+          return numA - numB;
+        });
+        
+        blankIds.forEach(blankId => {
+          const displayId = blankId.replace('Q', '');
+          const answers = question.correct[blankId].join(' / ');
+          parts.push(`Q${displayId}: ${answers}`);
+        });
+        
+        return parts.join(', ');
+      } else {
+        // Single-blank format
+        return Array.isArray(question.correct) ? question.correct.join(', ') : 'N/A';
+      }
+    
+    case 'dropdown':
+      if (!question.dropdowns) {
+        return 'N/A';
+      }
+      
       const parts = [];
-      const blankIds = Object.keys(question.correct).sort((a, b) => {
-        const numA = parseInt(a.replace('Q', ''));
-        const numB = parseInt(b.replace('Q', ''));
-        return numA - numB;
+      const ddIds = Object.keys(question.dropdowns).sort((a, b) => {
+        return parseInt(a.replace('DD', '')) - parseInt(b.replace('DD', ''));
       });
-    
-      blankIds.forEach(blankId => {
-        const displayId = blankId.replace('Q', '');
-        const answers = question.correct[blankId].join(' / ');
-        parts.push(`Q${displayId}: ${answers}`);
+      
+      ddIds.forEach(ddId => {
+        const displayId = ddId.replace('DD', '');
+        const ddData = question.dropdowns[ddId];
+        const correctIdx = ddData.correct;
+        const correctText = ddData.options[correctIdx];
+        parts.push(`DD${displayId}: ${correctText}`);
       });
-    
+      
       return parts.join(', ');
-    } else {
-      // Single-blank format
-      return Array.isArray(question.correct) ? question.correct.join(', ') : 'N/A';
-    }
     
     case 'matching':
       return Object.values(question.correct).join(', ');

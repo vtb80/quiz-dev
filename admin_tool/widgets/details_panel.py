@@ -243,6 +243,22 @@ class DetailsPanel:
                 answers = q.get_acceptable_answers('Q1')
                 for ans in answers:
                     text += f"  • {ans}\n"
+        elif q.type == "dropdown":
+            text += f"Question:\n{q.question}\n\n"
+            
+            # Get dropdown IDs in order
+            dropdown_ids = q.get_dropdown_ids()
+            
+            text += "Dropdowns:\n"
+            for dd_id in dropdown_ids:
+                display_id = dd_id.replace('DD', '')
+                options = q.get_options(dd_id)
+                correct_idx = q.get_correct_index(dd_id)
+                
+                text += f"\n  [DD{display_id}]:\n"
+                for i, opt in enumerate(options):
+                    mark = "✓" if i == correct_idx else " "
+                    text += f"    [{mark}] {i}. {opt}\n"            
         elif q.type == "matching":
             text += f"Question:\n{q.question}\n\n"
             text += "Pairs:\n"

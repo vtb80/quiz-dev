@@ -342,6 +342,84 @@ class QuestionValidator:
                 return False, f"Sub-question {i+1} has invalid correct answer"
         
         return True, ""
+    @staticmethod
+    def validate_dropdown(question_text: str, dropdowns: Dict[str, Dict]) -> Tuple[bool, str]:
+        """
+        Validate dropdown question
+        Returns: (is_valid, error_message)
+        """
+        import re
+        from shared.constants import (
+            MIN_DROPDOWNS, MAX_DROPDOWNS,
+            MIN_OPTIONS_PER_DROPDOWN, MAX_OPTIONS_PER_DROPDOWN,
+            DROPDOWN_PLACEHOLDER_PATTERN,
+            DROPDOWN_PLACEHOLDER_PREFIX,
+            DROPDOWN_PLACEHOLDER_SUFFIX
+        )
+        
+        if not question_text or not question_text.strip():
+            return False, "Question text is required"
+        
+        if not dropdowns or not isinstance(dropdowns, dict):
+            return False, "Dropdowns data is required"
+        
+        # Extract placeholders from text
+        placeholders = re.findall(DROPDOWN_PLACEHOLDER_PATTERN, question_text)
+        placeholder_ids = [f'DD{num}' for num in placeholders]
+        
+        if len(placeholder_ids) < MIN_DROPDOWNS:
+            return False, f"Need at least {MIN_DROPDOWNS} dropdown in text"
+        
+        if len(placeholder_ids) > MAX_DROPDOWNS:
+            return False, f"Maximum {MAX_DROPDOWNS} dropdowns allowed, found {len(placeholder_ids)}"
+        
+        # Validate consecutive numbering (DD1, DD2, DD3... no gaps)
+        dropdown_numbers = sorted([int(did.replace('DD', '')) for did in placeholder_ids])
+        expected_numbers = list(range(1, len(dropdown_numbers) + 1))
+        
+        if dropdown_numbers != expected_numbers:
+            return False, f"Dropdown numbering must be consecutive starting from 1. Expected: DD{', DD'.join(map(str, expected_numbers))}, Found: DD{', DD'.join(map(str, dropdown_numbers))}"
+        
+        # Check all placeholders have data
+        for pid in placeholder_ids:
+            if pid not in dropdowns:
+                return False, f"Dropdown {DROPDOWN_PLACEHOLDER_PREFIX}{pid.replace('DD', '')}{DROPDOWN_PLACEHOLDER_SUFFIX} found in text but no options provided"
+        
+        # Check all data has placeholders
+        for did in dropdowns.keys():
+            if did not in placeholder_ids:
+                return False, f"Options provided for {DROPDOWN_PLACEHOLDER_PREFIX}{did.replace('DD', '')}{DROPDOWN_PLACEHOLDER_SUFFIX} but not found in text"
+        
+        # Validate each dropdown
+        for dd_id, dd_data in dropdowns.items():
+            if not isinstance(dd_data, dict):
+                return False, f"{DROPDOWN_PLACEHOLDER_PREFIX}{dd_id.replace('DD', '')}{DROPDOWN_PLACEHOLDER_SUFFIX}: data must be a dictionary"
+            
+            options = dd_data.get('options', [])
+            correct = dd_data.get('correct')
+            
+            if not isinstance(options, list):
+                return False, f"{DROPDOWN_PLACEHOLDER_PREFIX}{dd_id.replace('DD', '')}{DROPDOWN_PLACEHOLDER_SUFFIX}: options must be a list"
+            
+            if len(options) < MIN_OPTIONS_PER_DROPDOWN:
+                return False, f"{DROPDOWN_PLACEHOLDER_PREFIX}{dd_id.replace('DD', '')}{DROPDOWN_PLACEHOLDER_SUFFIX}: need {MIN_OPTIONS_PER_DROPDOWN}-{MAX_OPTIONS_PER_DROPDOWN} options, found {len(options)}"
+            
+            if len(options) > MAX_OPTIONS_PER_DROPDOWN:
+                return False, f"{DROPDOWN_PLACEHOLDER_PREFIX}{dd_id.replace('DD', '')}{DROPDOWN_PLACEHOLDER_SUFFIX}: maximum {MAX_OPTIONS_PER_DROPDOWN} options allowed, found {len(options)}"
+            
+            # Check for empty options
+            for i, opt in enumerate(options):
+                if not opt or not opt.strip():
+                    return False, f"{DROPDOWN_PLACEHOLDER_PREFIX}{dd_id.replace('DD', '')}{DROPDOWN_PLACEHOLDER_SUFFIX}: option {i+1} is empty"
+            
+            # Validate correct index
+            if correct is None or not isinstance(correct, int):
+                return False, f"{DROPDOWN_PLACEHOLDER_PREFIX}{dd_id.replace('DD', '')}{DROPDOWN_PLACEHOLDER_SUFFIX}: correct answer index required (must be integer)"
+            
+            if correct < 0 or correct >= len(options):
+                return False, f"{DROPDOWN_PLACEHOLDER_PREFIX}{dd_id.replace('DD', '')}{DROPDOWN_PLACEHOLDER_SUFFIX}: correct index must be 0-{len(options)-1}, got {correct}"
+        
+        return True, ""
     
     @staticmethod
     def validate_question_by_type(question_type: str, **kwargs) -> Tuple[bool, str]:
@@ -354,6 +432,7 @@ class QuestionValidator:
             'multiple_choice_multiple': QuestionValidator.validate_multiple_choice_multiple,
             'true_false': QuestionValidator.validate_true_false,
             'fill_in_blank': QuestionValidator.validate_fill_in_blank,
+            'dropdown': QuestionValidator.validate_dropdown,  # NEW
             'matching': QuestionValidator.validate_matching,
             'reordering': QuestionValidator.validate_reordering,
             'reading_comprehension': QuestionValidator.validate_reading_comprehension

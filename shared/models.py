@@ -230,6 +230,109 @@ class FillInBlankQuestion(Question):
             correct=data.get('correct', [])  # Can be list or dict
         )
 
+@dataclass
+class DropdownQuestion(Question):
+    """Drop-down selection question - multiple dropdowns in text"""
+    question: str = ""  # Text with [DD1], [DD2], etc. placeholders
+    dropdowns: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # Format: {
+    #   'DD1': {'options': ['Paris', 'London', 'Berlin'], 'correct': 0},
+    #   'DD2': {'options': ['Seine', 'Thames', 'Rhine'], 'correct': 0}
+    # }
+    
+    def __post_init__(self):
+        self.type = 'dropdown'
+    
+    def get_dropdown_count(self) -> int:
+        """Get number of dropdowns in this question"""
+        return len(self.dropdowns)
+    
+    def get_dropdown_ids(self) -> List[str]:
+        """
+        Get list of dropdown IDs in order
+        Returns: ['DD1', 'DD2', ...] sorted numerically
+        """
+        dropdown_ids = list(self.dropdowns.keys())
+        dropdown_ids.sort(key=lambda x: int(x.replace('DD', '')))
+        return dropdown_ids
+    
+    def get_options(self, dropdown_id: str) -> List[str]:
+        """
+        Get options for a specific dropdown
+        Args:
+            dropdown_id: Dropdown identifier (e.g., 'DD1', 'DD2')
+        Returns: List of options for that dropdown
+        """
+        if dropdown_id in self.dropdowns:
+            return self.dropdowns[dropdown_id].get('options', [])
+        return []
+    
+    def get_correct_index(self, dropdown_id: str) -> Optional[int]:
+        """
+        Get correct answer index for a specific dropdown
+        Args:
+            dropdown_id: Dropdown identifier (e.g., 'DD1', 'DD2')
+        Returns: Correct index or None
+        """
+        if dropdown_id in self.dropdowns:
+            return self.dropdowns[dropdown_id].get('correct')
+        return None
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> 'DropdownQuestion':
+        """
+        Create DropdownQuestion from dictionary
+        """
+        return cls(
+            id=data.get('id', 0),
+            type='dropdown',
+            lessonId=data.get('lessonId'),
+            enabled=data.get('enabled', True),
+            questionImage=data.get('questionImage'),
+            questionImageScale=data.get('questionImageScale', DEFAULT_IMAGE_SCALE),
+            question=data.get('question', ''),
+            dropdowns=data.get('dropdowns', {})
+        )
+
+
+# IMPORTANT: Also update Question.from_dict() to route 'dropdown' type:
+
+"""
+Replace the Question.from_dict() method in shared/models.py with this corrected version:
+"""
+
+@classmethod
+def from_dict(cls, data: dict) -> 'Question':
+    """Create from dictionary - override in subclasses"""
+    qtype = data.get('type', 'multiple_choice')
+    
+    # Route to appropriate subclass
+    if qtype == 'multiple_choice':
+        return MultipleChoiceQuestion.from_dict(data)
+    elif qtype == 'multiple_choice_multiple':
+        return MultipleChoiceMultipleQuestion.from_dict(data)
+    elif qtype == 'true_false':
+        return TrueFalseQuestion.from_dict(data)
+    elif qtype == 'fill_in_blank':
+        return FillInBlankQuestion.from_dict(data)
+    elif qtype == 'dropdown':  # THIS WAS MISSING - ADD IT
+        return DropdownQuestion.from_dict(data)
+    elif qtype == 'matching':
+        return MatchingQuestion.from_dict(data)
+    elif qtype == 'reordering':
+        return ReorderingQuestion.from_dict(data)
+    elif qtype == 'reading_comprehension':
+        return ReadingComprehensionQuestion.from_dict(data)
+    else:
+        # Generic question - create with explicit type
+        return Question(
+            id=data.get('id', 0),
+            type=qtype,
+            lessonId=data.get('lessonId'),
+            enabled=data.get('enabled', True),
+            questionImage=data.get('questionImage'),
+            questionImageScale=data.get('questionImageScale', DEFAULT_IMAGE_SCALE)
+        )
 
 @dataclass
 class MatchingPair:

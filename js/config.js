@@ -6,12 +6,12 @@
 export const CONFIG = {
   // Available subjects to scan for
   POSSIBLE_SUBJECTS: [
-    'test 1'
+    'Sample'
   ],
 
   // Subject display names
   SUBJECT_ALIASES: {
-    'test 1': 'Sample Questions'
+    'Sample': 'Sample Questions'
   },
 
   // Question type display names
@@ -20,6 +20,7 @@ export const CONFIG = {
     'multiple_choice_multiple': 'Multiple Choice (Multiple Answers)',
     'true_false': 'True/False',
     'fill_in_blank': 'Fill in the Blank',
+    'dropdown': 'Drop-Down Selection',
     'matching': 'Matching',
     'reordering': 'Reordering',
     'reading_comprehension': 'Reading Comprehension'
@@ -27,7 +28,6 @@ export const CONFIG = {
 
   // Default settings
   DEFAULTS: {
-  //NUM_QUESTIONS: 5,
     MIN_QUESTIONS: 1,
     MAX_QUESTIONS: 100
   }

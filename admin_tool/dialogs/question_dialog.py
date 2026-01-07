@@ -1,6 +1,6 @@
 """
 Question Dialog - Create/Edit questions
-Version: 3.2 - Added MultipleChoiceMultiple support
+Version: 3.3 - Added Dropdown support
 """
 
 import tkinter as tk
@@ -21,6 +21,7 @@ from admin_tool.dialogs.question_forms import (
     MultipleChoiceMultipleForm,
     TrueFalseForm,
     FillInBlankForm,
+    DropdownForm,
     MatchingForm,
     ReorderingForm,
     ReadingComprehensionForm
@@ -202,6 +203,12 @@ class QuestionDialog:
                 self.question if self.mode == "edit" and isinstance(self.question, FillInBlankQuestion) else None
             )
         
+        elif qtype == "dropdown":  # NEW
+            self.current_form = DropdownForm(
+                self.content_frame, self.subject, self.lesson_id, self.mode,
+                self.question if self.mode == "edit" and isinstance(self.question, DropdownQuestion) else None
+            )
+        
         elif qtype == "matching":
             self.current_form = MatchingForm(
                 self.content_frame, self.subject, self.lesson_id, self.mode,
@@ -280,6 +287,8 @@ class QuestionDialog:
                 new_question = self.create_true_false(question_id, selected_lesson_id, data)
             elif qtype == "fill_in_blank":
                 new_question = self.create_fill_blank(question_id, selected_lesson_id, data)
+            elif qtype == "dropdown":  # NEW
+                new_question = self.create_dropdown(question_id, selected_lesson_id, data)
             elif qtype == "matching":
                 new_question = self.create_matching(question_id, selected_lesson_id, data)
             elif qtype == "reordering":
@@ -399,6 +408,17 @@ class QuestionDialog:
             lessonId=lesson_id,
             question=data['question'],
             correct=data['answers']
+        )
+        return self._attach_question_image(new_question, question_id, data)
+    
+    def create_dropdown(self, question_id, lesson_id, data):
+        """Create Dropdown question from data"""
+        new_question = DropdownQuestion(
+            id=question_id,
+            type='dropdown',
+            lessonId=lesson_id,
+            question=data['question'],
+            dropdowns=data['dropdowns']
         )
         return self._attach_question_image(new_question, question_id, data)
     

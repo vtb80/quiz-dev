@@ -1,11 +1,11 @@
 """
 Shared Constants and Configuration
-Version: 2.3 - Added multi-blank fill-in-the-blank constants
+Version: 2.4 - Added dropdown question type constants
 """
 
 # Application Info
 APP_NAME = "Quiz Admin"
-APP_VERSION = "2.3"
+APP_VERSION = "2.4"
 APP_TITLE = f"{APP_NAME} v{APP_VERSION} - Modular Edition"
 
 # Question Types
@@ -14,6 +14,7 @@ QUESTION_TYPES = [
     "multiple_choice_multiple",
     "true_false",
     "fill_in_blank",
+    "dropdown",
     "matching",
     "reordering",
     "reading_comprehension"
@@ -24,6 +25,7 @@ QUESTION_TYPE_NAMES = {
     'multiple_choice_multiple': 'Multiple Choice (Multiple Answers)',
     'true_false': 'True/False',
     'fill_in_blank': 'Fill in the Blank',
+    'dropdown': 'Drop-Down Selection',
     'matching': 'Matching',
     'reordering': 'Reordering',
     'reading_comprehension': 'Reading Comprehension'
@@ -34,6 +36,7 @@ QUESTION_TYPE_ICONS = {
     'multiple_choice_multiple': 'MCM',
     'true_false': 'TF',
     'fill_in_blank': 'FILL',
+    'dropdown': 'DD',
     'matching': 'MATCH',
     'reordering': 'REORD',
     'reading_comprehension': 'READ'
@@ -75,11 +78,20 @@ MIN_ANSWERS_FILL = 1
 MIN_SUBQUESTIONS_READING = 1
 MIN_CORRECT_ANSWERS_MCM = 1
 
-# NEW: Fill in the Blank - Multi-Blank Support
+# Fill in the Blank - Multi-Blank Support
 MAX_BLANKS_FILL = 10  # Maximum number of blanks allowed
 BLANK_PLACEHOLDER_PREFIX = "_Q"  # Placeholder format: _Q1_, _Q2_, etc.
 BLANK_PLACEHOLDER_SUFFIX = "_"
 BLANK_PLACEHOLDER_PATTERN = r'_Q(\d+)_'  # Regex pattern for validation
+
+# NEW: Drop-Down Selection - Multi-Dropdown Support
+MIN_DROPDOWNS = 1  # Minimum dropdowns in a question
+MAX_DROPDOWNS = 5  # Maximum dropdowns in a question
+MIN_OPTIONS_PER_DROPDOWN = 3  # Minimum options per dropdown
+MAX_OPTIONS_PER_DROPDOWN = 4  # Maximum options per dropdown
+DROPDOWN_PLACEHOLDER_PREFIX = "[DD"  # Placeholder format: [DD1], [DD2], etc.
+DROPDOWN_PLACEHOLDER_SUFFIX = "]"
+DROPDOWN_PLACEHOLDER_PATTERN = r'\[DD(\d+)\]'  # Regex pattern for validation
 
 # Default Values
 DEFAULT_NUM_QUESTIONS = 5
